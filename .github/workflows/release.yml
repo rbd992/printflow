@@ -75,7 +75,7 @@ jobs:
           chmod 600 ~/.ssh/nas_key
           echo -e "Host *\n  StrictHostKeyChecking no" > ~/.ssh/config
 
-          NAS="DunnR@100.68.105.76"
+          NAS="admin@100.68.105.76"
           ssh -i ~/.ssh/nas_key $NAS "mkdir -p /volume1/printflow1/data/updates"
 
           DMG=$(ls ./dist/*.dmg | head -1)
