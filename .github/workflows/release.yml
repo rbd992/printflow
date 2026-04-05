@@ -76,7 +76,7 @@ jobs:
           echo -e "Host *\n  StrictHostKeyChecking no" > ~/.ssh/config
 
           NAS="admin@100.68.105.76"
-          ssh -i ~/.ssh/nas_key $NAS "mkdir -p /volume1/printflow1/data/updates"
+          ssh -i ~/.ssh/nas_key $NAS "mkdir -p /volume1/printflow1/data/updates && chmod 777 /volume1/printflow1/data/updates"
 
           DMG=$(ls ./dist/*.dmg | head -1)
           EXE=$(ls ./dist/*.exe 2>/dev/null | head -1)
