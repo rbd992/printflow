@@ -78,30 +78,35 @@ jobs:
           mkdir -p ~/.ssh
           echo "${{ secrets.NAS_SSH_KEY }}" > ~/.ssh/nas_key
           chmod 600 ~/.ssh/nas_key
-          echo -e "Host *\n  StrictHostKeyChecking no" > ~/.ssh/config
+          echo -e "Host *\n  StrictHostKeyChecking no\n  BatchMode yes" > ~/.ssh/config
 
           NAS="admin@100.68.105.76"
-          
-          # Create updates dir if it doesn't exist (already chmod 777 by container)
-          ssh -i ~/.ssh/nas_key $NAS "mkdir -p /volume1/printflow1/data/updates" || true
+          SSH="ssh -i ~/.ssh/nas_key"
 
+          # Pipe files over plain SSH (avoids SFTP subsystem restriction on Synology)
           DMG=$(ls ./dist/*.dmg | head -1)
           EXE=$(ls ./dist/*.exe 2>/dev/null | head -1)
 
-          scp -i ~/.ssh/nas_key "$DMG" "$NAS:/volume1/printflow1/data/updates/PrintFlow-${VERSION}-mac.dmg"
-          [ -n "$EXE" ] && scp -i ~/.ssh/nas_key "$EXE" "$NAS:/volume1/printflow1/data/updates/PrintFlow-${VERSION}-win.exe"
+          echo "Uploading Mac DMG..."
+          cat "$DMG" | $SSH $NAS "cat > /volume1/printflow1/data/updates/PrintFlow-${VERSION}-mac.dmg"
 
+          if [ -n "$EXE" ]; then
+            echo "Uploading Windows EXE..."
+            cat "$EXE" | $SSH $NAS "cat > /volume1/printflow1/data/updates/PrintFlow-${VERSION}-win.exe"
+          fi
+
+          echo "Writing manifest..."
           PUBLISHED=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-          ssh -i ~/.ssh/nas_key $NAS "cat > /volume1/printflow1/data/updates/latest.json << 'MANIFEST'
+          $SSH $NAS "cat > /volume1/printflow1/data/updates/latest.json" << EOF
           {
-            \"version\": \"${VERSION}\",
-            \"publishedAt\": \"${PUBLISHED}\",
-            \"releaseNotes\": \"See the Changelog tab in the app for full details.\",
-            \"macUrl\": \"http://10.0.0.219:3001/updates/PrintFlow-${VERSION}-mac.dmg\",
-            \"winUrl\": \"http://10.0.0.219:3001/updates/PrintFlow-${VERSION}-win.exe\",
-            \"macUrlRemote\": \"http://100.68.105.76:3001/updates/PrintFlow-${VERSION}-mac.dmg\",
-            \"winUrlRemote\": \"http://100.68.105.76:3001/updates/PrintFlow-${VERSION}-win.exe\"
+            "version": "${VERSION}",
+            "publishedAt": "${PUBLISHED}",
+            "releaseNotes": "See the Changelog tab in the app for full details.",
+            "macUrl": "http://10.0.0.219:3001/updates/PrintFlow-${VERSION}-mac.dmg",
+            "winUrl": "http://10.0.0.219:3001/updates/PrintFlow-${VERSION}-win.exe",
+            "macUrlRemote": "http://100.68.105.76:3001/updates/PrintFlow-${VERSION}-mac.dmg",
+            "winUrlRemote": "http://100.68.105.76:3001/updates/PrintFlow-${VERSION}-win.exe"
           }
-          MANIFEST"
+          EOF
 
-          echo "Done — PrintFlow v${VERSION} published to NAS"
+          echo "Done - PrintFlow v${VERSION} published to NAS"
