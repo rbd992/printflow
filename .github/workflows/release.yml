@@ -82,9 +82,8 @@ jobs:
 
           NAS="admin@100.68.105.76"
           
-          # Create updates dir — try direct path first, then via sudo
-          ssh -i ~/.ssh/nas_key $NAS "chmod 777 /volume1/printflow1/data 2>/dev/null; mkdir -p /volume1/printflow1/data/updates && chmod 777 /volume1/printflow1/data/updates" || \
-          ssh -i ~/.ssh/nas_key $NAS "mkdir -p /volume1/printflow1/updates && chmod 777 /volume1/printflow1/updates"
+          # Create updates dir if it doesn't exist (already chmod 777 by container)
+          ssh -i ~/.ssh/nas_key $NAS "mkdir -p /volume1/printflow1/data/updates" || true
 
           DMG=$(ls ./dist/*.dmg | head -1)
           EXE=$(ls ./dist/*.exe 2>/dev/null | head -1)
