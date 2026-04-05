@@ -125,7 +125,7 @@ export default function AppShell({ theme, onThemeChange }) {
           <img src="/icon.png" alt="PrintFlow" style={{ width:32,height:32,borderRadius:9,flexShrink:0 }} onError={e=>{e.target.style.display='none';}} />
           <div>
             <div style={{ fontSize:13,fontWeight:700,letterSpacing:'-0.01em' }}>PrintFlow</div>
-            <div style={{ fontSize:10,color:'var(--text-tertiary)',textTransform:'capitalize' }}>v1.0.5 · {role}</div>
+            <div style={{ fontSize:10,color:'var(--text-tertiary)',textTransform:'capitalize' }}>v1.0.6 · {role}</div>
           </div>
         </div>
 
@@ -138,8 +138,10 @@ export default function AppShell({ theme, onThemeChange }) {
             <NavItem to="/parts"    icon="🔧" label="Parts & Supplies" userRole={role} />
           </SidebarSection>
           <SidebarSection label="Operations">
-            <NavItem to="/orders"   icon="📦" label="Orders"    badge={pendingOrders} userRole={role} />
-            <NavItem to="/printers" icon={<PrinterNav />} label="Printers"   userRole={role} />
+            <NavItem to="/orders"    icon="📦" label="Orders"           badge={pendingOrders} userRole={role} />
+            <NavItem to="/queue"     icon="⏳" label="Job Queue"        userRole={role} />
+            <NavItem to="/customers" icon="👥" label="Customers"        userRole={role} />
+            <NavItem to="/printers"  icon={<PrinterNav />} label="Printers" userRole={role} />
             <NavItem to="/shipping" icon="🚚" label="Shipping"   minRole="manager" userRole={role} />
             <NavItem to="/vendors"  icon="🛒" label="Vendors"    userRole={role} />
           </SidebarSection>

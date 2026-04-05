@@ -3,6 +3,31 @@
 
 export const CHANGELOG = [
   {
+    version: '1.0.6',
+    date: '2026-04-05',
+    title: 'Job Queue, Customer CRM & Shopify Fix',
+    highlights: [
+      'New Job Queue — Kanban board to track prints from queued to done',
+      'New Customer CRM — full customer database with order history and analytics',
+      'Fixed Shopify “Manage” button redirecting to login page',
+      'Job Queue links to orders and printers for full workflow visibility',
+      'Customers auto-populated from existing order history',
+    ],
+    changes: [
+      { type: 'new',     text: 'Job Queue page — Kanban board with Queued / Printing / Done / Failed columns, drag-free stage moving' },
+      { type: 'new',     text: 'Job Queue — link print jobs to orders and printers, track material, color, grams, estimated duration' },
+      { type: 'new',     text: 'Job Queue — priority system, file name tracking, per-job notes' },
+      { type: 'new',     text: 'Job Queue — filter view by stage, board stats in header' },
+      { type: 'new',     text: 'Customer CRM page — full customer database with name, email, phone, address, tags and notes' },
+      { type: 'new',     text: 'Customer CRM — auto-builds customer list from existing order history with no manual entry required' },
+      { type: 'new',     text: 'Customer CRM — customer detail panel shows all order history, total spent, avg order value' },
+      { type: 'new',     text: 'Customer CRM — repeat buyer badge, revenue metrics, one-click email button' },
+      { type: 'new',     text: 'Server routes — /api/jobs and /api/customers with full CRUD, auto-creates SQLite tables on first use' },
+      { type: 'fix',     text: 'Shopify “Manage” button no longer redirects to login — fixed 401 interceptor to only logout on auth route failures' },
+      { type: 'fix',     text: 'API client — 401 errors on feature routes (settings, jobs, customers) no longer clear the session' },
+    ],
+  },
+  {
     version: '1.0.5',
     date: '2026-04-05',
     title: 'Auto-Updates, Smart Connection & 3D Printer Icons',

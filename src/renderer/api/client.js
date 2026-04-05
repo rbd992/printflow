@@ -21,12 +21,18 @@ function createClient() {
     return config;
   });
 
-  // Handle 401 — token expired → logout
+  // Handle 401 — only logout if it's an auth endpoint, not a missing/broken route
   client.interceptors.response.use(
     (res) => res,
     async (err) => {
       if (err.response?.status === 401) {
-        useAuthStore.getState().logout();
+        const url = err.config?.url || '';
+        // Only force logout on core auth endpoints, not on feature routes
+        // that may not be patched into the container yet
+        const isAuthRoute = url.includes('/api/auth/me') || url.includes('/api/auth/refresh');
+        if (isAuthRoute) {
+          useAuthStore.getState().logout();
+        }
       }
       return Promise.reject(err);
     }
