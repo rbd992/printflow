@@ -1,0 +1,11 @@
+node_modules/
+build/
+dist/
+.DS_Store
+*.dmg
+*.exe
+*.log
+.env
+scripts/
+assets/
+public/
