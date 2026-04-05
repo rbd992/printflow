@@ -34,7 +34,12 @@ jobs:
           node-version: '20'
       - run: npm install
       - run: npm run react-build
-      - run: npx electron-builder --win --publish never
+      - name: Build Windows EXE (with retry)
+        uses: nick-fields/retry@v3
+        with:
+          timeout_minutes: 20
+          max_attempts: 3
+          command: npx electron-builder --win --publish never
       - uses: actions/upload-artifact@v4
         with:
           name: windows-exe
@@ -76,7 +81,10 @@ jobs:
           echo -e "Host *\n  StrictHostKeyChecking no" > ~/.ssh/config
 
           NAS="admin@100.68.105.76"
-          ssh -i ~/.ssh/nas_key $NAS "mkdir -p /volume1/printflow1/data/updates && chmod 777 /volume1/printflow1/data/updates"
+          
+          # Create updates dir — try direct path first, then via sudo
+          ssh -i ~/.ssh/nas_key $NAS "chmod 777 /volume1/printflow1/data 2>/dev/null; mkdir -p /volume1/printflow1/data/updates && chmod 777 /volume1/printflow1/data/updates" || \
+          ssh -i ~/.ssh/nas_key $NAS "mkdir -p /volume1/printflow1/updates && chmod 777 /volume1/printflow1/updates"
 
           DMG=$(ls ./dist/*.dmg | head -1)
           EXE=$(ls ./dist/*.exe 2>/dev/null | head -1)
