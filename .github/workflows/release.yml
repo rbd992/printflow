@@ -1,0 +1,102 @@
+name: Build & Release PrintFlow
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  build-mac:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - run: npm ci
+      - run: npm run react-build
+      - run: npx electron-builder --mac --publish never
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mac-dmg
+          path: dist/*.dmg
+          retention-days: 7
+
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - run: npm ci
+      - run: npm run react-build
+      - run: npx electron-builder --win --publish never
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-exe
+          path: dist/*.exe
+          retention-days: 7
+
+  publish:
+    needs: [build-mac, build-windows]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: mac-dmg
+          path: ./dist
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: windows-exe
+          path: ./dist
+
+      - name: Get version
+        id: ver
+        run: echo "VERSION=$(node -e "console.log(require('./package.json').version)")" >> $GITHUB_OUTPUT
+
+      - name: Setup Tailscale
+        uses: tailscale/github-action@v2
+        with:
+          authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
+
+      - name: Deploy to NAS
+        env:
+          VERSION: ${{ steps.ver.outputs.VERSION }}
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.NAS_SSH_KEY }}" > ~/.ssh/nas_key
+          chmod 600 ~/.ssh/nas_key
+          echo -e "Host *\n  StrictHostKeyChecking no" > ~/.ssh/config
+
+          NAS="DunnR@100.68.105.76"
+          ssh -i ~/.ssh/nas_key $NAS "mkdir -p /volume1/printflow1/data/updates"
+
+          DMG=$(ls ./dist/*.dmg | head -1)
+          EXE=$(ls ./dist/*.exe 2>/dev/null | head -1)
+
+          scp -i ~/.ssh/nas_key "$DMG" "$NAS:/volume1/printflow1/data/updates/PrintFlow-${VERSION}-mac.dmg"
+          [ -n "$EXE" ] && scp -i ~/.ssh/nas_key "$EXE" "$NAS:/volume1/printflow1/data/updates/PrintFlow-${VERSION}-win.exe"
+
+          PUBLISHED=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          ssh -i ~/.ssh/nas_key $NAS "cat > /volume1/printflow1/data/updates/latest.json << 'MANIFEST'
+          {
+            \"version\": \"${VERSION}\",
+            \"publishedAt\": \"${PUBLISHED}\",
+            \"releaseNotes\": \"See the Changelog tab in the app for full details.\",
+            \"macUrl\": \"http://10.0.0.219:3001/updates/PrintFlow-${VERSION}-mac.dmg\",
+            \"winUrl\": \"http://10.0.0.219:3001/updates/PrintFlow-${VERSION}-win.exe\",
+            \"macUrlRemote\": \"http://100.68.105.76:3001/updates/PrintFlow-${VERSION}-mac.dmg\",
+            \"winUrlRemote\": \"http://100.68.105.76:3001/updates/PrintFlow-${VERSION}-win.exe\"
+          }
+          MANIFEST"
+
+          echo "Done — PrintFlow v${VERSION} published to NAS"
