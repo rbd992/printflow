@@ -17,7 +17,6 @@ const store = new Store({
 const isDev     = process.env.ELECTRON_START_URL || !app.isPackaged;
 const START_URL = process.env.ELECTRON_START_URL || `file://${path.join(__dirname, '../../build/index.html')}`;
 
-// NAS server endpoints
 const LAN_URL       = 'http://10.0.0.219:3001';
 const TAILSCALE_URL = 'http://100.68.105.76:3001';
 
@@ -25,50 +24,35 @@ let mainWindow;
 
 function createWindow() {
   const { width, height } = store.get('windowBounds');
-
   mainWindow = new BrowserWindow({
-    width,
-    height,
-    minWidth: 1024,
-    minHeight: 680,
+    width, height, minWidth: 1024, minHeight: 680,
     titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'hidden',
-    frame: false,
-    backgroundColor: '#0A1628',
-    show: false,
+    frame: false, backgroundColor: '#0A1628', show: false,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
-      contextIsolation: true,
-      nodeIntegration: false,
-      sandbox: false,
-      webSecurity: true,
-      webviewTag: true,
+      contextIsolation: true, nodeIntegration: false,
+      sandbox: false, webSecurity: true, webviewTag: true,
     },
   });
-
   const theme = store.get('theme');
   if (theme !== 'system') nativeTheme.themeSource = theme;
-
   mainWindow.loadURL(START_URL);
-
   mainWindow.once('ready-to-show', () => {
     mainWindow.show();
     if (isDev) mainWindow.webContents.openDevTools({ mode: 'detach' });
   });
-
   mainWindow.on('resize', () => {
     const [w, h] = mainWindow.getSize();
     store.set('windowBounds', { width: w, height: h });
   });
-
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     shell.openExternal(url);
     return { action: 'deny' };
   });
-
   mainWindow.on('closed', () => { mainWindow = null; });
 }
 
-// ── Helper: HTTP GET with timeout ──────────────────────────────────
+// ── HTTP GET with timeout ──────────────────────────────────────────
 function httpGet(url, timeoutMs = 5000) {
   return new Promise((resolve, reject) => {
     const lib = url.startsWith('https') ? https : http;
@@ -85,72 +69,78 @@ function httpGet(url, timeoutMs = 5000) {
   });
 }
 
-// ── Auto-detect best server URL ────────────────────────────────────
-// Tries LAN first (fast, ~200ms timeout), falls back to Tailscale
+// ── Race all server candidates simultaneously ──────────────────────
+// ENETUNREACH (Tailscale off) fails instantly and doesn't block other candidates
+// Returns { url, data } for the first server that responds with status 200
+function findReachableServer(urlPath, timeoutMs = 5000) {
+  const savedUrl = store.get('serverUrl');
+  const candidates = [...new Set([savedUrl, LAN_URL, TAILSCALE_URL].filter(Boolean))];
+
+  return new Promise((resolve) => {
+    let settled = false;
+    let failures = 0;
+
+    candidates.forEach(baseUrl => {
+      httpGet(`${baseUrl}${urlPath}`, timeoutMs)
+        .then(res => {
+          if (!settled && res.status === 200 && res.data) {
+            settled = true;
+            resolve({ url: baseUrl, data: res.data });
+          } else {
+            if (++failures === candidates.length && !settled) resolve(null);
+          }
+        })
+        .catch(() => {
+          if (++failures === candidates.length && !settled) resolve(null);
+        });
+    });
+
+    // Hard safety timeout
+    setTimeout(() => { if (!settled) { settled = true; resolve(null); } }, timeoutMs + 1000);
+  });
+}
+
+// ── Auto-detect best server — races LAN + Tailscale simultaneously ─
 ipcMain.handle('server:autoDetect', async () => {
-  // Try LAN first with a tight timeout
-  try {
-    const res = await httpGet(`${LAN_URL}/health`, 2500);
-    if (res.data?.status === 'ok') {
-      return { url: LAN_URL, mode: 'lan' };
-    }
-  } catch {}
-
-  // Fall back to Tailscale
-  try {
-    const res = await httpGet(`${TAILSCALE_URL}/health`, 6000);
-    if (res.data?.status === 'ok') {
-      return { url: TAILSCALE_URL, mode: 'tailscale' };
-    }
-  } catch {}
-
-  return { url: null, mode: 'none' };
+  const result = await findReachableServer('/health', 4000);
+  if (!result || result.data?.status !== 'ok') return { url: null, mode: 'none' };
+  const mode = result.url.includes('100.68.105.76') ? 'tailscale' : 'lan';
+  return { url: result.url, mode };
 });
 
-// ── Check for updates ──────────────────────────────────────────────
-// Tries saved URL first, then auto-detects best reachable server
+// ── Check for updates — races all candidates simultaneously ─────────
 ipcMain.handle('updates:check', async () => {
   const currentVersion = app.getVersion();
   store.set('lastUpdateCheck', Date.now());
 
-  // Try to find a reachable server — saved URL, then Tailscale, then LAN
-  const savedUrl = store.get('serverUrl');
-  const candidates = [];
-  if (savedUrl) candidates.push(savedUrl);
-  if (!candidates.includes(TAILSCALE_URL)) candidates.push(TAILSCALE_URL);
-  if (!candidates.includes(LAN_URL))       candidates.push(LAN_URL);
+  const result = await findReachableServer('/updates/latest.json', 6000);
 
-  let lastError = 'No server reachable';
-  for (const serverUrl of candidates) {
-    try {
-      const res = await httpGet(`${serverUrl}/updates/latest.json`, 6000);
-      if (res.status !== 200) continue;
-      const manifest = res.data;
-      if (!manifest.version) continue;
-      return {
-        currentVersion,
-        latestVersion:   manifest.version,
-        updateAvailable: compareVersions(manifest.version, currentVersion) > 0,
-        releaseNotes:    manifest.releaseNotes || '',
-        macUrl:          manifest.macUrl   || null,
-        winUrl:          manifest.winUrl   || null,
-        macUrlRemote:    manifest.macUrlRemote || manifest.macUrl || null,
-        winUrlRemote:    manifest.winUrlRemote || manifest.winUrl || null,
-        publishedAt:     manifest.publishedAt  || null,
-        serverUsed:      serverUrl,
-      };
-    } catch (err) {
-      lastError = err.message;
-    }
+  if (!result) {
+    return { error: 'Could not reach server — check your connection', currentVersion, updateAvailable: false };
   }
 
-  return { error: lastError, currentVersion, updateAvailable: false };
+  const manifest = result.data;
+  if (!manifest.version) {
+    return { error: 'Invalid update manifest', currentVersion, updateAvailable: false };
+  }
+
+  const onTailscale = result.url.includes('100.68.105.76');
+  return {
+    currentVersion,
+    latestVersion:   manifest.version,
+    updateAvailable: compareVersions(manifest.version, currentVersion) > 0,
+    releaseNotes:    manifest.releaseNotes || '',
+    macUrl:   onTailscale ? (manifest.macUrlRemote || manifest.macUrl) : manifest.macUrl,
+    winUrl:   onTailscale ? (manifest.winUrlRemote || manifest.winUrl) : manifest.winUrl,
+    macUrlRemote: manifest.macUrlRemote || manifest.macUrl,
+    winUrlRemote: manifest.winUrlRemote || manifest.winUrl,
+    publishedAt:  manifest.publishedAt  || null,
+    serverUsed:   result.url,
+  };
 });
 
 // ── Download update ────────────────────────────────────────────────
 ipcMain.handle('updates:download', async (_, downloadUrl) => {
-  // Open the download URL in the system browser
-  // The user downloads and installs manually (safest cross-platform approach)
   shell.openExternal(downloadUrl);
   return { ok: true };
 });
@@ -158,7 +148,7 @@ ipcMain.handle('updates:download', async (_, downloadUrl) => {
 // Get current app version
 ipcMain.handle('app:getVersion', () => app.getVersion());
 
-// Simple semver comparison: returns 1 if a > b, -1 if a < b, 0 if equal
+// Simple semver comparison
 function compareVersions(a, b) {
   const pa = a.split('.').map(Number);
   const pb = b.split('.').map(Number);
@@ -170,7 +160,6 @@ function compareVersions(a, b) {
 }
 
 // ── IPC Handlers ───────────────────────────────────────────────────
-
 ipcMain.handle('config:getServerUrl', () => store.get('serverUrl'));
 ipcMain.handle('config:setServerUrl', (_, url) => { store.set('serverUrl', url); return true; });
 
@@ -206,7 +195,6 @@ ipcMain.on('window:maximize', () => {
 });
 ipcMain.on('window:close', () => mainWindow?.close());
 ipcMain.handle('window:isMaximized', () => mainWindow?.isMaximized() ?? false);
-
 ipcMain.on('shell:openExternal', (_, url) => shell.openExternal(url));
 
 // ── App lifecycle ──────────────────────────────────────────────────
