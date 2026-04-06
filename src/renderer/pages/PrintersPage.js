@@ -113,61 +113,134 @@ function PrinterForm({ form, setForm, isEdit }) {
   );
 }
 
-// ── Camera Feed ───────────────────────────────────────────────────────────────
+// ── Camera Feed — fetch-based MJPEG reader (works in Electron) ───────────────
+// <img> tags don't reliably handle multipart/x-mixed-replace in Electron.
+// Instead we fetch the stream manually, parse JPEG boundaries, and draw to canvas.
 function CameraFeed({ printer, token }) {
   const [streaming, setStreaming] = useState(false);
   const [error, setError]         = useState(null);
   const [loading, setLoading]     = useState(false);
-  const imgRef = useRef(null);
-  const serverUrl = getServerUrl();
-  const streamUrl = `${serverUrl}/api/camera/${printer.serial}/stream`;
+  const canvasRef  = useRef(null);
+  const abortRef   = useRef(null);
+  const serverUrl  = getServerUrl();
+  const streamUrl  = `${serverUrl}/api/camera/${printer.serial}/stream`;
 
-  function startStream() { setLoading(true); setError(null); setStreaming(true); }
-  function stopStream() {
-    setStreaming(false); setError(null);
-    api.delete(`/api/camera/${printer.serial}/stream`).catch(()=>{});
-  }
-  function handleLoad() { setLoading(false); }
-  function handleError() {
-    setLoading(false);
-    // Fetch the actual error message from the stream endpoint
-    fetch(`${streamUrl}?token=${encodeURIComponent(token)}&t=${Date.now()}`)
-      .then(r => r.json())
-      .then(j => setError(j.error || 'Could not connect to camera'))
-      .catch(() => setError('Could not connect to camera.\n\u2022 Enable "LAN Mode Liveview" in printer Settings \u2192 Network\n\u2022 Check IP and access code in Edit Settings\n\u2022 ffmpeg must be installed (rebuild via DSM Task Scheduler)'));
+  const stopStream = useCallback(() => {
+    if (abortRef.current) { abortRef.current.abort(); abortRef.current = null; }
+    api.delete(`/api/camera/${printer.serial}/stream`).catch(() => {});
     setStreaming(false);
-  }
+    setLoading(false);
+  }, [printer.serial]);
+
+  const startStream = useCallback(async () => {
+    setError(null);
+    setLoading(true);
+    setStreaming(true);
+
+    const controller = new AbortController();
+    abortRef.current = controller;
+
+    try {
+      const res = await fetch(`${streamUrl}?token=${encodeURIComponent(token)}`, {
+        signal: controller.signal,
+      });
+
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        throw new Error(j.error || `HTTP ${res.status}`);
+      }
+
+      const contentType = res.headers.get('content-type') || '';
+      if (!contentType.includes('multipart')) {
+        throw new Error('Unexpected response from camera server');
+      }
+
+      setLoading(false);
+      const reader  = res.body.getReader();
+      let   buf     = new Uint8Array(0);
+      const SOI     = new Uint8Array([0xFF, 0xD8]);
+      const EOI     = new Uint8Array([0xFF, 0xD9]);
+
+      const indexOf = (haystack, needle, from = 0) => {
+        outer: for (let i = from; i <= haystack.length - needle.length; i++) {
+          for (let j = 0; j < needle.length; j++) {
+            if (haystack[i + j] !== needle[j]) continue outer;
+          }
+          return i;
+        }
+        return -1;
+      };
+
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+
+        // Append new chunk
+        const next = new Uint8Array(buf.length + value.length);
+        next.set(buf); next.set(value, buf.length);
+        buf = next;
+
+        // Extract all complete JPEG frames
+        let start = 0;
+        while (true) {
+          const soi = indexOf(buf, SOI, start);
+          if (soi === -1) break;
+          const eoi = indexOf(buf, EOI, soi + 2);
+          if (eoi === -1) break;
+          const frame = buf.slice(soi, eoi + 2);
+          start = eoi + 2;
+
+          // Draw frame to canvas
+          const blob = new Blob([frame], { type: 'image/jpeg' });
+          const url  = URL.createObjectURL(blob);
+          const img  = new Image();
+          img.onload = () => {
+            const canvas = canvasRef.current;
+            if (canvas) {
+              canvas.width  = img.width;
+              canvas.height = img.height;
+              canvas.getContext('2d').drawImage(img, 0, 0);
+            }
+            URL.revokeObjectURL(url);
+          };
+          img.src = url;
+        }
+        buf = buf.slice(start);
+      }
+    } catch (err) {
+      if (err.name === 'AbortError') return; // normal stop
+      setError(err.message || 'Camera connection failed');
+    } finally {
+      setStreaming(false);
+      setLoading(false);
+    }
+  }, [streamUrl, token]);
 
   useEffect(() => {
-    return () => { if (streaming) api.delete(`/api/camera/${printer.serial}/stream`).catch(()=>{}); };
-  }, [streaming, printer.serial]);
+    return () => stopStream();
+  }, [stopStream]);
 
   return (
     <div style={{ marginTop:12 }}>
       {!streaming ? (
         <button className="btn btn-ghost btn-sm"
-          onClick={e=>{ e.stopPropagation(); startStream(); }}
+          onClick={e => { e.stopPropagation(); startStream(); }}
           style={{ fontSize:11,color:'var(--accent)',width:'100%',justifyContent:'center',border:'0.5px solid var(--accent)',borderRadius:'var(--r-sm)',padding:'6px 0' }}>
           📹 View Camera
         </button>
       ) : (
-        <div style={{ position:'relative',borderRadius:'var(--r-sm)',overflow:'hidden',background:'#000' }}>
+        <div style={{ position:'relative',borderRadius:'var(--r-sm)',overflow:'hidden',background:'#000',minHeight:80 }}>
           {loading && (
             <div style={{ position:'absolute',inset:0,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',background:'rgba(0,0,0,0.85)',zIndex:1,gap:8 }}>
               <div style={{ width:24,height:24,border:'2px solid rgba(255,255,255,0.2)',borderTopColor:'var(--accent)',borderRadius:'50%',animation:'spin 0.8s linear infinite' }}/>
               <div style={{ fontSize:11,color:'var(--text-secondary)' }}>Connecting to camera...</div>
             </div>
           )}
-          <img ref={imgRef}
-            src={`${streamUrl}?token=${encodeURIComponent(token)}&t=${Date.now()}`}
-            alt={`${printer.name} camera`}
-            onLoad={handleLoad} onError={handleError}
-            onClick={e=>e.stopPropagation()}
+          <canvas ref={canvasRef}
+            onClick={e => e.stopPropagation()}
             style={{ width:'100%',display:'block',maxHeight:240,objectFit:'cover' }} />
           <div style={{ position:'absolute',top:6,right:6,display:'flex',gap:4 }}>
-            <button onClick={e=>{ e.stopPropagation(); window.printflow.openExternal(`${streamUrl}?token=${encodeURIComponent(token)}`); }}
-              style={{ background:'rgba(0,0,0,0.6)',border:'none',color:'#fff',borderRadius:4,padding:'3px 7px',fontSize:10,cursor:'pointer' }} title="Open fullscreen">⛶</button>
-            <button onClick={e=>{ e.stopPropagation(); stopStream(); }}
+            <button onClick={e => { e.stopPropagation(); stopStream(); }}
               style={{ background:'rgba(0,0,0,0.6)',border:'none',color:'#fff',borderRadius:4,padding:'3px 7px',fontSize:10,cursor:'pointer' }}>✖ Stop</button>
           </div>
           <div style={{ position:'absolute',top:6,left:6,background:'var(--red)',color:'#fff',fontSize:9,fontWeight:700,padding:'2px 6px',borderRadius:4,letterSpacing:'0.05em' }}>LIVE</div>
@@ -175,7 +248,7 @@ function CameraFeed({ printer, token }) {
       )}
       {error && (
         <div style={{ marginTop:6,padding:'8px 10px',background:'var(--red-light)',borderRadius:'var(--r-sm)',fontSize:11,color:'var(--red)',lineHeight:1.6,whiteSpace:'pre-line' }}>
-          {error}
+          ⚠ {error}
         </div>
       )}
       {!streaming && !error && (

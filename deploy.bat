@@ -122,19 +122,44 @@ exit /b 0
 
 :do_release
 echo.
-REM Get current version using Node.js (reliable)
-for /f %%v in ('node -e "console.log(require('./package.json').version)"') do set CURRENT_VER=%%v
 
-echo   Current version: !CURRENT_VER!
-set /p NEW_VER="   New version (e.g. 1.0.10): "
+REM Get current version from package.json
+for /f %%v in ('node -e "console.log(require('./package.json').version)"') do set CURRENT_VER=%%v
+echo   package.json version : v!CURRENT_VER!
+
+REM Check if this version already exists as a GitHub tag
+echo   Checking GitHub for existing releases...
+for /f %%r in ('node -e "var https=require('https'),opt={hostname:'api.github.com',path:'/repos/rbd992/printflow/git/refs/tags/v!CURRENT_VER!',headers:{'User-Agent':'deploy-bat','Authorization':''}};var r=https.request(opt,function(res){process.stdout.write(String(res.statusCode));});r.on('error',function(){process.stdout.write('ERR');});r.end();" 2^>nul') do set GH_STATUS=%%r
+
+REM Compute auto-suggested next patch version
+for /f %%n in ('node -e "var v='!CURRENT_VER!'.split('.');v[2]=parseInt(v[2])+1;console.log(v.join('.'))"') do set NEXT_VER=%%n
+
+if "!GH_STATUS!"=="200" (
+    echo.
+    echo   *** WARNING: v!CURRENT_VER! already exists on GitHub! ***
+    echo   Running deploy twice at the same version causes the update
+    echo   checker to see no new release and users won't be prompted.
+    echo.
+    echo   Current : v!CURRENT_VER!  ^(already released^)
+    echo   Suggested: v!NEXT_VER!
+    echo.
+    set /p NEW_VER="   New version [press Enter to use !NEXT_VER!]: "
+    if "!NEW_VER!"=="" set NEW_VER=!NEXT_VER!
+) else (
+    echo   v!CURRENT_VER! not yet released - OK to proceed.
+    echo.
+    set /p NEW_VER="   New version [press Enter to use !CURRENT_VER!]: "
+    if "!NEW_VER!"=="" set NEW_VER=!CURRENT_VER!
+)
+
 if "!NEW_VER!"=="" (
     echo ERROR: Version required
     pause
     exit /b 1
 )
 
-REM Update version in package.json using Node.js (avoids PowerShell regex issues with dots)
-node -e "var fs=require('fs'),p=JSON.parse(fs.readFileSync('package.json','utf8'));p.version='!NEW_VER!';fs.writeFileSync('package.json',JSON.stringify(p,null,2)+'\n');console.log('Version updated to !NEW_VER!');"
+REM Update version in package.json using Node.js
+node -e "var fs=require('fs'),p=JSON.parse(fs.readFileSync('package.json','utf8'));p.version='!NEW_VER!';fs.writeFileSync('package.json',JSON.stringify(p,null,2)+'\n');console.log('  package.json -> v!NEW_VER!');"
 
 REM Commit the version bump
 git add package.json
