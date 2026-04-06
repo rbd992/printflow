@@ -163,7 +163,7 @@ REM Update version in package.json using Node.js
 node -e "var fs=require('fs'),p=JSON.parse(fs.readFileSync('package.json','utf8'));p.version='!NEW_VER!';fs.writeFileSync('package.json',JSON.stringify(p,null,2)+'\n');console.log('  package.json -> v!NEW_VER!');"
 
 REM Auto-update version strings in AppShell.js and LoginPage.js
-node -e "var fs=require('fs');['src/renderer/pages/AppShell.js','src/renderer/pages/LoginPage.js'].forEach(function(f){var s=fs.readFileSync(f,'utf8');var u=s.replace(/v1\.\d+\.\d+(?= [·\\u00b7])/g,'v!NEW_VER!').replace(/v1\.\d+\.\d+(?=\\n)/g,'v!NEW_VER!').replace(/(v)1\.\d+\.\d+(?=')/g,'$1!NEW_VER!');fs.writeFileSync(f,u);console.log('  '+f+' -> v!NEW_VER!');});"
+node -e "var fs=require('fs');var ver='!NEW_VER!';['src/renderer/pages/AppShell.js','src/renderer/pages/LoginPage.js'].forEach(function(f){var s=fs.readFileSync(f,'utf8');var u=s.replace(/v1\.\d+\.\d+/g,function(m,offset){var ctx=s.slice(Math.max(0,offset-5),offset+20);if(ctx.includes('role')||ctx.includes('text-tertiary')||ctx.includes('v'+ver))return 'v'+ver;return m;});fs.writeFileSync(f,u);console.log('  '+f+' updated');});"
 
 REM Stage updated files
 git add src/renderer/pages/AppShell.js src/renderer/pages/LoginPage.js

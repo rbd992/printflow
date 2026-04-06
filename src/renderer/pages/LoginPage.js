@@ -240,7 +240,7 @@ export default function LoginPage() {
         </div>
 
         <div style={{ marginTop:20,fontSize:10,color:'var(--text-tertiary)' }}>
-          v1.0.17
+          v1.0.18
         </div>
       </div>
     </div>
