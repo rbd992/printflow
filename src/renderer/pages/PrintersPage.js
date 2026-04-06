@@ -2,7 +2,7 @@ import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { api, getServerUrl } from '../api/client';
 import { onSocketEvent } from '../api/socket';
 import { useAuthStore } from '../stores/authStore';
-import { CHANGELOG } from '../data/changelog';
+import { CHANGELOG } from '../data/changelog'; // used in AppShell, imported here for bundle
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 function Modal({ title, onClose, children, width=480 }) {
@@ -113,141 +113,157 @@ function PrinterForm({ form, setForm, isEdit }) {
   );
 }
 
-// ── Camera Feed — fetch-based MJPEG reader (works in Electron) ───────────────
-// <img> tags don't reliably handle multipart/x-mixed-replace in Electron.
-// Instead we fetch the stream manually, parse JPEG boundaries, and draw to canvas.
+// ── Camera Feed ───────────────────────────────────────────────────────────────
+// State machine: idle → loading → streaming → idle (reconnects on stream end)
+// Uses refs for control flags to avoid stale closure issues.
 function CameraFeed({ printer, token }) {
-  const [streaming, setStreaming] = useState(false);
-  const [error, setError]         = useState(null);
-  const [loading, setLoading]     = useState(false);
+  const [phase, setPhase]           = useState('idle');  // idle|loading|streaming|error
+  const [errorMsg, setErrorMsg]     = useState('');
   const [frameCount, setFrameCount] = useState(0);
-  const canvasRef  = useRef(null);
-  const abortRef   = useRef(null);
-  const serverUrl  = getServerUrl();
-  const streamUrl  = `${serverUrl}/api/camera/${printer.serial}/stream`;
 
-  const stopStream = useCallback(() => {
-    if (abortRef.current) { abortRef.current.abort(); abortRef.current = null; }
-    api.delete(`/api/camera/${printer.serial}/stream`).catch(() => {});
-    setStreaming(false);
-    setLoading(false);
-    setFrameCount(0);
-  }, [printer.serial]);
+  const canvasRef     = useRef(null);
+  const abortRef      = useRef(null);
+  const activeRef     = useRef(false);   // true while we WANT the stream running
+  const frameCountRef = useRef(0);       // avoid setState every frame
 
-  const startStream = useCallback(async () => {
-    setError(null);
-    setLoading(true);
-    setStreaming(true);
-    setFrameCount(0);
+  const serverUrl = getServerUrl();
+  const streamUrl = `${serverUrl}/api/camera/${printer.serial}/stream`;
 
-    const controller = new AbortController();
-    abortRef.current = controller;
+  const CRLF2 = new Uint8Array([0x0d, 0x0a, 0x0d, 0x0a]);
 
+  function appendBuf(a, b) {
+    const n = new Uint8Array(a.length + b.length);
+    n.set(a); n.set(b, a.length); return n;
+  }
+
+  function findSeq(hay, needle, from) {
+    from = from || 0;
+    outer: for (let i = from; i <= hay.length - needle.length; i++) {
+      for (let j = 0; j < needle.length; j++) if (hay[i+j] !== needle[j]) continue outer;
+      return i;
+    }
+    return -1;
+  }
+
+  function drawFrame(bytes) {
+    frameCountRef.current++;
+    // Throttle React re-renders — update every 5 frames (~1s at 5fps)
+    if (frameCountRef.current % 5 === 0) setFrameCount(frameCountRef.current);
+    createImageBitmap(new Blob([bytes], { type: 'image/jpeg' }))
+      .then(bm => {
+        const cv = canvasRef.current;
+        if (!cv) { bm.close(); return; }
+        cv.width = bm.width; cv.height = bm.height;
+        cv.getContext('2d').drawImage(bm, 0, 0);
+        bm.close();
+      }).catch(() => {});
+  }
+
+  // Single stream attempt — returns reason string when done
+  async function runStream(signal) {
+    setPhase('loading');
+    let res;
     try {
-      const res = await fetch(`${streamUrl}?token=${encodeURIComponent(token)}`, {
-        signal: controller.signal,
-      });
+      res = await fetch(`${streamUrl}?token=${encodeURIComponent(token)}`, { signal });
+    } catch (err) {
+      if (err.name === 'AbortError') return 'aborted';
+      return `Connection failed: ${err.message}`;
+    }
+    if (!res.ok) {
+      const j = await res.json().catch(() => ({}));
+      return j.error || `HTTP ${res.status}`;
+    }
+    const ct = res.headers.get('content-type') || '';
+    if (!ct.includes('multipart')) return `Unexpected response: ${ct}`;
 
-      if (!res.ok) {
-        const j = await res.json().catch(() => ({}));
-        throw new Error(j.error || `HTTP ${res.status}`);
-      }
-
-      const contentType = res.headers.get('content-type') || '';
-      if (!contentType.includes('multipart')) {
-        throw new Error('Server returned unexpected content type: ' + contentType);
-      }
-
-      setLoading(false);
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder('utf-8', { fatal: false });
-      let buf = new Uint8Array(0);
-      let frames = 0;
-
-      const append = (a, b) => { const n = new Uint8Array(a.length + b.length); n.set(a); n.set(b, a.length); return n; };
-      const indexOfSeq = (hay, needle, from = 0) => {
-        outer: for (let i = from; i <= hay.length - needle.length; i++) {
-          for (let j = 0; j < needle.length; j++) if (hay[i+j] !== needle[j]) continue outer;
-          return i;
-        }
-        return -1;
-      };
-      const CRLF2 = new Uint8Array([0x0d,0x0a,0x0d,0x0a]);
-
-      const drawFrame = (frameBytes) => {
-        frames++;
-        setFrameCount(frames);
-        // Use createImageBitmap instead of blob URL — more reliable in Electron
-        const blob = new Blob([frameBytes], { type: 'image/jpeg' });
-        createImageBitmap(blob).then(bitmap => {
-          const canvas = canvasRef.current;
-          if (!canvas) { bitmap.close(); return; }
-          canvas.width  = bitmap.width;
-          canvas.height = bitmap.height;
-          canvas.getContext('2d').drawImage(bitmap, 0, 0);
-          bitmap.close();
-        }).catch(() => {
-          // fallback: blob URL method
-          const url = URL.createObjectURL(blob);
-          const img = new Image();
-          img.onload = () => {
-            const canvas = canvasRef.current;
-            if (canvas) {
-              canvas.width  = img.naturalWidth  || 640;
-              canvas.height = img.naturalHeight || 480;
-              canvas.getContext('2d').drawImage(img, 0, 0);
-            }
-            URL.revokeObjectURL(url);
-          };
-          img.onerror = () => URL.revokeObjectURL(url);
-          img.src = url;
-        });
-      };
-
+    setPhase('streaming');
+    const reader  = res.body.getReader();
+    const decoder = new TextDecoder('utf-8', { fatal: false });
+    let buf = new Uint8Array(0);
+    try {
       while (true) {
         const { value, done } = await reader.read();
-        if (done) break;
-        buf = append(buf, value);
-
+        if (done) return 'ended';
+        buf = appendBuf(buf, value);
         while (true) {
-          const headerEnd = indexOfSeq(buf, CRLF2);
-          if (headerEnd === -1) break;
-
-          const headerText = decoder.decode(buf.slice(0, headerEnd));
-          const clMatch = headerText.match(/Content-Length:\s*(\d+)/i);
-          if (!clMatch) { buf = buf.slice(headerEnd + 4); continue; }
-
-          const frameLen = parseInt(clMatch[1], 10);
-          const frameStart = headerEnd + 4;
-          const frameEnd = frameStart + frameLen;
-
-          if (buf.length < frameEnd) break;
-
-          drawFrame(buf.slice(frameStart, frameEnd));
-          buf = buf.slice(frameEnd);
+          const he = findSeq(buf, CRLF2);
+          if (he === -1) break;
+          const ht = decoder.decode(buf.slice(0, he));
+          const m  = ht.match(/Content-Length:\s*(\d+)/i);
+          if (!m) { buf = buf.slice(he + 4); continue; }
+          const fl = parseInt(m[1], 10), fs = he + 4, fe = fs + fl;
+          if (buf.length < fe) break;
+          drawFrame(buf.slice(fs, fe));
+          buf = buf.slice(fe);
         }
       }
-      // Stream ended naturally — reconnect after brief pause
-      if (!controller.signal.aborted) {
-        await new Promise(r => setTimeout(r, 1500));
-        if (!controller.signal.aborted) startStream();
-      }
     } catch (err) {
-      if (err.name === 'AbortError') return;
-      setError(err.message || 'Camera connection failed');
-      setStreaming(false);
+      if (err.name === 'AbortError') return 'aborted';
+      return `Stream error: ${err.message}`;
     } finally {
-      setLoading(false);
+      try { reader.cancel(); } catch {}
     }
+  }
+
+  // Start the reconnecting stream loop
+  const startStream = useCallback(() => {
+    if (activeRef.current) return;
+    activeRef.current     = true;
+    frameCountRef.current = 0;
+    setFrameCount(0);
+    setErrorMsg('');
+
+    (async () => {
+      while (activeRef.current) {
+        const ctrl = new AbortController();
+        abortRef.current = ctrl;
+        const result = await runStream(ctrl.signal);
+
+        if (!activeRef.current || result === 'aborted') break;
+
+        if (result !== 'ended') {
+          // Real error — show message, retry in 3s
+          setErrorMsg(result);
+          setPhase('error');
+          await new Promise(r => setTimeout(r, 3000));
+          if (!activeRef.current) break;
+          setErrorMsg('');
+        } else {
+          // Clean end (e.g. popout disconnected server stream) — reconnect quickly
+          await new Promise(r => setTimeout(r, 800));
+        }
+      }
+      // Loop exited cleanly
+      abortRef.current = null;
+      setPhase('idle');
+      setFrameCount(0);
+      frameCountRef.current = 0;
+    })();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [streamUrl, token]);
 
-  useEffect(() => {
-    return () => stopStream();
-  }, [stopStream]);
+  const stopStream = useCallback(() => {
+    activeRef.current = false;
+    abortRef.current?.abort();
+    abortRef.current = null;
+    api.delete(`/api/camera/${printer.serial}/stream`).catch(() => {});
+    setPhase('idle');
+    setFrameCount(0);
+    frameCountRef.current = 0;
+    setErrorMsg('');
+  }, [printer.serial]);
+
+  // Cleanup on unmount
+  useEffect(() => () => {
+    activeRef.current = false;
+    abortRef.current?.abort();
+  }, []);
+
+  const isActive = phase !== 'idle';
 
   return (
     <div style={{ marginTop:12 }}>
-      {!streaming ? (
+      {!isActive ? (
         <button className="btn btn-ghost btn-sm"
           onClick={e => { e.stopPropagation(); startStream(); }}
           style={{ fontSize:11,color:'var(--accent)',width:'100%',justifyContent:'center',border:'0.5px solid var(--accent)',borderRadius:'var(--r-sm)',padding:'6px 0' }}>
@@ -255,46 +271,37 @@ function CameraFeed({ printer, token }) {
         </button>
       ) : (
         <div style={{ position:'relative',borderRadius:'var(--r-sm)',overflow:'hidden',background:'#000',minHeight:80 }}>
-          {loading && (
+          {phase === 'loading' && (
             <div style={{ position:'absolute',inset:0,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',background:'rgba(0,0,0,0.85)',zIndex:1,gap:8 }}>
               <div style={{ width:24,height:24,border:'2px solid rgba(255,255,255,0.2)',borderTopColor:'var(--accent)',borderRadius:'50%',animation:'spin 0.8s linear infinite' }}/>
               <div style={{ fontSize:11,color:'var(--text-secondary)' }}>Connecting to camera...</div>
             </div>
           )}
-          <canvas ref={canvasRef}
-            onClick={e => e.stopPropagation()}
+          {phase === 'error' && (
+            <div style={{ position:'absolute',inset:0,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',background:'rgba(0,0,0,0.75)',zIndex:1,gap:6,padding:12 }}>
+              <div style={{ fontSize:11,color:'var(--red)',textAlign:'center' }}>⚠ {errorMsg}</div>
+              <div style={{ fontSize:10,color:'var(--text-tertiary)' }}>Retrying in 3s...</div>
+            </div>
+          )}
+          <canvas ref={canvasRef} onClick={e=>e.stopPropagation()}
             style={{ width:'100%',display:'block',maxHeight:240,objectFit:'cover' }} />
           <div style={{ position:'absolute',top:6,right:6,display:'flex',gap:4 }}>
-            <button onClick={e => {
-              e.stopPropagation();
-              // Open fullscreen camera view in a new Electron window via IPC
-              window.printflow.openCameraPopout({
-                serial: printer.serial,
-                name: printer.name,
-                streamUrl: `${streamUrl}?token=${encodeURIComponent(token)}`,
-              });
-            }}
-              style={{ background:'rgba(0,0,0,0.6)',border:'none',color:'#fff',borderRadius:4,padding:'3px 7px',fontSize:10,cursor:'pointer' }}
-              title="Open fullscreen">
-              ⛶
-            </button>
-            <button onClick={e => { e.stopPropagation(); stopStream(); }}
+            <button onClick={e=>{ e.stopPropagation(); window.printflow.openCameraPopout({ serial:printer.serial, name:printer.name, streamUrl:`${streamUrl}?token=${encodeURIComponent(token)}` }); }}
+              style={{ background:'rgba(0,0,0,0.6)',border:'none',color:'#fff',borderRadius:4,padding:'3px 7px',fontSize:10,cursor:'pointer' }} title="Open fullscreen">⛶</button>
+            <button onClick={e=>{ e.stopPropagation(); stopStream(); }}
               style={{ background:'rgba(0,0,0,0.6)',border:'none',color:'#fff',borderRadius:4,padding:'3px 7px',fontSize:10,cursor:'pointer' }}>✖ Stop</button>
           </div>
           <div style={{ position:'absolute',top:6,left:6,display:'flex',gap:4,alignItems:'center' }}>
-            <div style={{ background:'var(--red)',color:'#fff',fontSize:9,fontWeight:700,padding:'2px 6px',borderRadius:4,letterSpacing:'0.05em' }}>LIVE</div>
+            <div style={{ background:phase==='error'?'var(--amber)':phase==='loading'?'var(--text-tertiary)':'var(--red)',color:'#fff',fontSize:9,fontWeight:700,padding:'2px 6px',borderRadius:4,letterSpacing:'0.05em' }}>
+              {phase==='loading'?'CONNECTING':phase==='error'?'RECONNECTING':'LIVE'}
+            </div>
             {frameCount > 0 && <div style={{ background:'rgba(0,0,0,0.6)',color:'#fff',fontSize:9,padding:'2px 6px',borderRadius:4 }}>{frameCount} frames</div>}
           </div>
         </div>
       )}
-      {error && (
-        <div style={{ marginTop:6,padding:'8px 10px',background:'var(--red-light)',borderRadius:'var(--r-sm)',fontSize:11,color:'var(--red)',lineHeight:1.6,whiteSpace:'pre-line' }}>
-          ⚠ {error}
-        </div>
-      )}
-      {!streaming && !error && (
+      {phase === 'idle' && (
         <div style={{ marginTop:4,fontSize:10,color:'var(--text-tertiary)',textAlign:'center' }}>
-          Requires "LAN Mode Liveview" enabled on printer
+          H2C/X1C require "LAN Mode Liveview" enabled on printer
         </div>
       )}
     </div>

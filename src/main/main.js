@@ -247,7 +247,14 @@ app.on('window-all-closed', () => {
 
 app.on('web-contents-created', (_, contents) => {
   contents.on('will-navigate', (event, url) => {
-    if (!url.startsWith(START_URL) && !url.startsWith('http://localhost')) {
+    // Allow main app, dev server, and camera popout served from NAS
+    const allowed = [
+      START_URL,
+      'http://localhost',
+      LAN_URL,
+      TAILSCALE_URL,
+    ];
+    if (!allowed.some(a => url.startsWith(a))) {
       event.preventDefault();
     }
   });

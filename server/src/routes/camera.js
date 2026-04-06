@@ -40,7 +40,6 @@ function streamJpegTcp(res, ip, accessCode, serial) {
   const MAGIC = Buffer.from([0x40, 0x00, 0x00, 0x00]); // frame header magic
 
   const client = net.createConnection({ host: ip, port: PORT });
-  activeStreams.set(serial, { type: 'tcp', socket: client });
 
   let authenticated = false;
   let buffer = Buffer.alloc(0);
@@ -112,7 +111,6 @@ function streamJpegTcp(res, ip, accessCode, serial) {
 
   client.on('error', err => {
     logger.error(`[Camera:${serial}] TCP error: ${err.message}`);
-    activeStreams.delete(serial);
     if (!res.writableEnded) {
       if (!res.headersSent) {
         res.status(500).json({ error: `Camera connection failed: ${err.message}` });
@@ -124,7 +122,6 @@ function streamJpegTcp(res, ip, accessCode, serial) {
 
   client.on('close', () => {
     logger.info(`[Camera:${serial}] TCP connection closed`);
-    activeStreams.delete(serial);
     if (!res.writableEnded) res.end();
   });
 
@@ -147,17 +144,18 @@ function streamRtsps(res, ip, accessCode, serial) {
     'pipe:1',
   ]);
 
-  activeStreams.set(serial, { type: 'ffmpeg', proc: ffmpeg });
-
   let frameBuf = Buffer.alloc(0);
+  const CRLF   = Buffer.from('\r\n');
+  const SOI    = Buffer.from([0xFF, 0xD8]);
+  const EOI    = Buffer.from([0xFF, 0xD9]);
 
   ffmpeg.stdout.on('data', chunk => {
     frameBuf = Buffer.concat([frameBuf, chunk]);
     let start = 0;
     while (true) {
-      const soi = frameBuf.indexOf(Buffer.from([0xFF, 0xD8]), start);
+      const soi = frameBuf.indexOf(SOI, start);
       if (soi === -1) break;
-      const eoi = frameBuf.indexOf(Buffer.from([0xFF, 0xD9]), soi + 2);
+      const eoi = frameBuf.indexOf(EOI, soi + 2);
       if (eoi === -1) break;
       const frame = frameBuf.slice(soi, eoi + 2);
       if (!res.writableEnded) {
@@ -174,7 +172,6 @@ function streamRtsps(res, ip, accessCode, serial) {
 
   ffmpeg.on('close', code => {
     logger.info(`[Camera:${serial}] ffmpeg exited (${code})`);
-    activeStreams.delete(serial);
     if (!res.writableEnded) res.end();
   });
 
@@ -183,7 +180,6 @@ function streamRtsps(res, ip, accessCode, serial) {
       ? 'ffmpeg not found — rebuild the container via DSM Task Scheduler'
       : err.message;
     logger.error(`[Camera:${serial}] ${msg}`);
-    activeStreams.delete(serial);
     if (!res.headersSent) res.status(500).json({ error: msg });
   });
 
