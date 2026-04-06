@@ -26,13 +26,6 @@ if errorlevel 1 (
 )
 
 REM Check if there are any changes to commit
-git diff --quiet && git diff --cached --quiet
-if errorlevel 1 (
-    set HAS_CHANGES=1
-) else (
-    set HAS_CHANGES=0
-)
-
 git status --porcelain > "%TEMP%\pf_status.txt"
 for %%A in ("%TEMP%\pf_status.txt") do set STATUS_SIZE=%%~zA
 if %STATUS_SIZE% EQU 0 (
@@ -52,14 +45,14 @@ REM Detect what changed
 set APP_CHANGED=0
 set SERVER_CHANGED=0
 
-git diff --name-only HEAD > "%TEMP%\pf_changed.txt" 2>nul
-git diff --cached --name-only >> "%TEMP%\pf_changed.txt" 2>nul
-git status --porcelain >> "%TEMP%\pf_changed.txt" 2>nul
+git status --porcelain > "%TEMP%\pf_changed.txt" 2>nul
 
-findstr /i "^server" "%TEMP%\pf_changed.txt" >nul && set SERVER_CHANGED=1
-findstr /i "^src\|^public\|^assets\|package.json\|^.github" "%TEMP%\pf_changed.txt" >nul && set APP_CHANGED=1
+findstr /i "server" "%TEMP%\pf_changed.txt" >nul && set SERVER_CHANGED=1
+findstr /i "src\\" "%TEMP%\pf_changed.txt" >nul && set APP_CHANGED=1
+findstr /i "package.json" "%TEMP%\pf_changed.txt" >nul && set APP_CHANGED=1
+findstr /i "public\\" "%TEMP%\pf_changed.txt" >nul && set APP_CHANGED=1
 
-REM If we can't detect specifically, assume both
+REM If nothing detected specifically, assume both
 if %APP_CHANGED%==0 if %SERVER_CHANGED%==0 (
     set APP_CHANGED=1
     set SERVER_CHANGED=1
@@ -121,31 +114,27 @@ if /i "!DO_RELEASE!"=="yes" goto :do_release
 
 echo.
 echo ==========================================
-echo   Pushed! Server deploy triggered if
-echo   server files changed.
-echo   No app release created.
+echo   Pushed! No app release created.
 echo ==========================================
 echo.
 pause
 exit /b 0
 
 :do_release
-REM Get current version from package.json
-for /f "tokens=2 delims=:, " %%a in ('findstr "\"version\"" package.json') do (
-    set CURRENT_VER=%%~a
-)
-
 echo.
+REM Get current version using Node.js (reliable)
+for /f %%v in ('node -e "console.log(require('./package.json').version)"') do set CURRENT_VER=%%v
+
 echo   Current version: !CURRENT_VER!
-set /p NEW_VER="   New version (e.g. 1.0.9): "
+set /p NEW_VER="   New version (e.g. 1.0.10): "
 if "!NEW_VER!"=="" (
     echo ERROR: Version required
     pause
     exit /b 1
 )
 
-REM Update version in package.json
-powershell -Command "(Get-Content package.json) -replace '\"version\": \"!CURRENT_VER!\"', '\"version\": \"!NEW_VER!\"' | Set-Content package.json"
+REM Update version in package.json using Node.js (avoids PowerShell regex issues with dots)
+node -e "var fs=require('fs'),p=JSON.parse(fs.readFileSync('package.json','utf8'));p.version='!NEW_VER!';fs.writeFileSync('package.json',JSON.stringify(p,null,2)+'\n');console.log('Version updated to !NEW_VER!');"
 
 REM Commit the version bump
 git add package.json
