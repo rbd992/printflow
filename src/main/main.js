@@ -24,6 +24,21 @@ let mainWindow;
 
 function createWindow() {
   const { width, height } = store.get('windowBounds');
+
+  // Allow loading media (camera MJPEG streams) from local NAS over HTTP
+  // This is safe — the NAS is on the local network and all requests are auth-token gated
+  const { session } = require('electron');
+  session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
+    callback({
+      responseHeaders: {
+        ...details.responseHeaders,
+        'Content-Security-Policy': [
+          "default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob: http://10.0.0.219:3001 http://100.68.105.76:3001 ws://10.0.0.219:3001 ws://100.68.105.76:3001",
+        ],
+      },
+    });
+  });
+
   mainWindow = new BrowserWindow({
     width, height, minWidth: 1024, minHeight: 680,
     titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'hidden',
