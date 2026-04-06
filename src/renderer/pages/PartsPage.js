@@ -1,12 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { FULL_PARTS_CATALOGUE, MAINTENANCE_SCHEDULE } from '../data/bambuParts';
+import { FULL_PARTS_CATALOGUE, MAINTENANCE_SCHEDULE, getAllParts } from '../data/bambuParts';
 import { useAuthStore } from '../stores/authStore';
 import { partsApi, settingsApi } from '../api/client';
 
 function getCatalogueParts() {
-  return Object.entries(FULL_PARTS_CATALOGUE).flatMap(([cat, data]) =>
-    data.items.map(item => ({ ...item, category: cat, categoryIcon: data.icon }))
-  );
+  return getAllParts();
 }
 
 const HST = 0.13;
@@ -26,6 +24,18 @@ function Modal({ title, onClose, children, width = 560 }) {
   );
 }
 
+// Part image with fallback to emoji icon
+function PartImage({ img, icon, size = 48 }) {
+  const [failed, setFailed] = useState(false);
+  if (img && !failed) {
+    return (
+      <img src={img} alt="" onError={() => setFailed(true)}
+        style={{ width:size, height:size, objectFit:'contain', flexShrink:0, borderRadius:6, background:'#f5f5f5', padding:2 }} />
+    );
+  }
+  return <div style={{ fontSize: size * 0.5, flexShrink:0, display:'flex', alignItems:'center', justifyContent:'center', width:size, height:size }}>{icon || '🔩'}</div>;
+}
+
 export default function PartsPage() {
   const [tab, setTab]             = useState('inventory');
   const [inventory, setInventory] = useState([]);
@@ -35,7 +45,6 @@ export default function PartsPage() {
   const [printerFilter, setPrinterFilter] = useState('');
   const [search, setSearch]               = useState('');
   const [mainPrinter, setMainPrinter]     = useState('');
-  // Maintenance completion stored server-side so all users share it
   const [completed, setCompleted] = useState({});
   const { user } = useAuthStore();
   const canEdit = ['owner', 'manager'].includes(user?.role);
@@ -43,7 +52,6 @@ export default function PartsPage() {
   const allCatParts = getCatalogueParts();
   const categories  = [...new Set(allCatParts.map(p => p.category))];
 
-  // ── Load parts from server ──────────────────────────────────────
   const loadParts = useCallback(async () => {
     setLoading(true);
     try {
@@ -55,7 +63,6 @@ export default function PartsPage() {
     setLoading(false);
   }, []);
 
-  // ── Load maintenance completion from server ─────────────────────
   const loadCompleted = useCallback(async () => {
     try {
       const res = await settingsApi.get('maintenance_completed');
@@ -65,13 +72,10 @@ export default function PartsPage() {
 
   useEffect(() => { loadParts(); loadCompleted(); }, [loadParts, loadCompleted]);
 
-  // ── Add part from catalogue → POST to server ────────────────────
   async function addFromCatalogue(part) {
     try {
-      // Check if already in inventory by SKU (stored in description or name)
       const existing = inventory.find(i => i.name === part.name && i.category === part.category);
       if (existing) {
-        // Increment quantity via PATCH
         await partsApi.update(existing.id, { quantity: (existing.quantity || 1) + 1 });
       } else {
         await partsApi.create({
@@ -90,7 +94,6 @@ export default function PartsPage() {
     setShowAdd(false);
   }
 
-  // ── Adjust quantity ─────────────────────────────────────────────
   async function adjustQty(part, delta) {
     const newQty = Math.max(0, (part.quantity || 1) + delta);
     if (newQty === 0) {
@@ -102,13 +105,11 @@ export default function PartsPage() {
     await loadParts();
   }
 
-  // ── Remove part ─────────────────────────────────────────────────
   async function removeItem(id) {
     if (!window.confirm('Remove this part from inventory?')) return;
     try { await partsApi.remove(id); await loadParts(); } catch {}
   }
 
-  // ── Maintenance tracking (shared via server settings) ───────────
   async function markComplete(key) {
     const updated = { ...completed, [key]: new Date().toLocaleDateString('en-CA') };
     setCompleted(updated);
@@ -132,17 +133,15 @@ export default function PartsPage() {
     return days > task.interval_days * 0.8 && days <= task.interval_days;
   }
 
-  // Map server parts back to catalogue data for display
   function getCatalogueData(serverPart) {
     const desc = serverPart.description || '';
     const sku  = desc.split(' | ')[0];
-    const cat  = allCatParts.find(p => p.sku === sku || p.name === serverPart.name);
-    return cat || null;
+    return allCatParts.find(p => p.sku === sku || p.name === serverPart.name) || null;
   }
 
   const catalogueFiltered = allCatParts.filter(p => {
-    if (catFilter    && p.category !== catFilter)              return false;
-    if (printerFilter && !p.compatible.includes(printerFilter)) return false;
+    if (catFilter     && p.category !== catFilter)               return false;
+    if (printerFilter && !p.compatible.includes(printerFilter))  return false;
     if (search && !`${p.name} ${p.sku} ${p.notes || ''}`.toLowerCase().includes(search.toLowerCase())) return false;
     return true;
   });
@@ -158,7 +157,7 @@ export default function PartsPage() {
           <div>
             <h1>Parts & Supplies</h1>
             <p style={{ color:'var(--text-secondary)',fontSize:13,marginTop:4 }}>
-              Shared inventory — all users see the same parts · Bambu Lab P1S, H2D & Vortex
+              Shared inventory — all users see the same parts · Bambu Lab P1S & H2C
             </p>
           </div>
           {canEdit && tab === 'inventory' && (
@@ -189,7 +188,6 @@ export default function PartsPage() {
               ))}
             </div>
 
-            {/* Inventory */}
             {loading ? (
               <div style={{ textAlign:'center',padding:48,color:'var(--text-secondary)',fontSize:13 }}>Loading parts...</div>
             ) : inventory.length === 0 ? (
@@ -197,7 +195,7 @@ export default function PartsPage() {
                 <div style={{ fontSize:48,marginBottom:12 }}>🔧</div>
                 <div style={{ fontSize:16,fontWeight:600,marginBottom:8 }}>No parts in inventory</div>
                 <div style={{ fontSize:13,color:'var(--text-secondary)',marginBottom:20 }}>
-                  Click "Add Part" to browse the Bambu Lab and Vortex parts catalogue
+                  Click "Add Part" to browse the Bambu Lab P1S and H2C parts catalogue
                 </div>
                 {canEdit && <button className="btn btn-primary" onClick={() => setShowAdd(true)}>+ Add First Part</button>}
               </div>
@@ -207,20 +205,26 @@ export default function PartsPage() {
                   const cat = getCatalogueData(item);
                   return (
                     <div key={item.id} className="card" style={{ padding:16 }}>
-                      <div style={{ display:'flex',alignItems:'flex-start',gap:10,marginBottom:10 }}>
-                        <div style={{ fontSize:24,flexShrink:0 }}>{cat?.categoryIcon || '🔩'}</div>
+                      <div style={{ display:'flex',alignItems:'flex-start',gap:12,marginBottom:10 }}>
+                        <PartImage img={cat?.img} icon={cat?.categoryIcon} size={52} />
                         <div style={{ flex:1,minWidth:0 }}>
                           <div style={{ fontSize:13,fontWeight:600,lineHeight:1.3,marginBottom:2 }}>{item.name}</div>
-                          <div style={{ fontSize:10,fontFamily:'monospace',color:'var(--text-tertiary)' }}>{item.description?.split(' | ')[0]}</div>
-                          <div style={{ display:'flex',gap:4,marginTop:4,flexWrap:'wrap' }}>
-                            {(cat?.compatible || []).map(c => <span key={c} className="pill pill-blue" style={{ fontSize:9 }}>{c}</span>)}
+                          <div style={{ fontSize:10,fontFamily:'monospace',color:'var(--text-tertiary)',marginBottom:4 }}>{item.description?.split(' | ')[0]}</div>
+                          <div style={{ display:'flex',gap:4,flexWrap:'wrap' }}>
+                            {(cat?.compatible || []).map(c => (
+                              <span key={c} className={`pill ${c==='P1S'?'pill-blue':'pill-purple'}`} style={{ fontSize:9 }}>{c}</span>
+                            ))}
                             <span className="pill pill-grey" style={{ fontSize:9 }}>{item.category}</span>
                           </div>
                         </div>
                       </div>
-                      <div style={{ fontSize:11,color:'var(--text-secondary)',marginBottom:10,lineHeight:1.4 }}>
-                        {item.description?.split(' | ').slice(1, -1).join(' · ')}
-                      </div>
+
+                      {cat?.notes && (
+                        <div style={{ fontSize:11,color:'var(--text-secondary)',marginBottom:10,lineHeight:1.4 }}>
+                          {cat.notes}
+                        </div>
+                      )}
+
                       <div style={{ display:'flex',alignItems:'center',justifyContent:'space-between' }}>
                         <div>
                           <div style={{ fontSize:15,fontWeight:700,color:'var(--accent)' }}>${(item.unit_cost || 0).toFixed(2)}</div>
@@ -229,7 +233,7 @@ export default function PartsPage() {
                         <div style={{ display:'flex',alignItems:'center',gap:6 }}>
                           {canEdit && (
                             <button className="btn btn-secondary btn-sm" style={{ width:28,height:28,padding:0,justifyContent:'center' }}
-                              onClick={() => adjustQty(item, -1)}>-</button>
+                              onClick={() => adjustQty(item, -1)}>−</button>
                           )}
                           <span style={{ fontSize:16,fontWeight:700,minWidth:28,textAlign:'center' }}>{item.quantity || 1}</span>
                           {canEdit && (
@@ -238,12 +242,17 @@ export default function PartsPage() {
                           )}
                         </div>
                       </div>
+
                       {canEdit && (
                         <div style={{ marginTop:10,display:'flex',justifyContent:'space-between',alignItems:'center' }}>
                           {cat?.url && (
-                            <button className="btn btn-ghost btn-sm" style={{ fontSize:10 }} onClick={() => window.printflow.openExternal(cat.url)}>Shop ↗</button>
+                            <button className="btn btn-ghost btn-sm" style={{ fontSize:10 }}
+                              onClick={() => window.printflow.openExternal(cat.url)}>
+                              Buy on Bambu ↗
+                            </button>
                           )}
-                          <button className="btn btn-ghost btn-sm" style={{ fontSize:10,color:'var(--red)' }} onClick={() => removeItem(item.id)}>Remove</button>
+                          <button className="btn btn-ghost btn-sm" style={{ fontSize:10,color:'var(--red)' }}
+                            onClick={() => removeItem(item.id)}>Remove</button>
                         </div>
                       )}
                     </div>
@@ -258,7 +267,9 @@ export default function PartsPage() {
           <div>
             <div style={{ display:'flex',gap:10,marginBottom:16,alignItems:'center' }}>
               <select className="select" style={{ width:160 }} value={mainPrinter} onChange={e => setMainPrinter(e.target.value)}>
-                <option value="">All Printers</option><option>P1S</option><option>H2D</option>
+                <option value="">All Printers</option>
+                <option value="P1S">P1S</option>
+                <option value="H2C">H2C</option>
               </select>
               <div style={{ display:'flex',gap:12,fontSize:12,color:'var(--text-secondary)' }}>
                 {[['var(--green)','Done'],['var(--amber)','Due Soon'],['var(--red)','Overdue'],['var(--text-tertiary)','Pending']].map(([c, l]) => (
@@ -283,9 +294,9 @@ export default function PartsPage() {
                     <div style={{ display:'flex',alignItems:'flex-start',gap:12 }}>
                       <div style={{ width:12,height:12,borderRadius:'50%',background:dc,boxShadow:`0 0 6px ${dc}`,marginTop:3,flexShrink:0 }} />
                       <div style={{ flex:1 }}>
-                        <div style={{ display:'flex',alignItems:'center',gap:8,marginBottom:4 }}>
+                        <div style={{ display:'flex',alignItems:'center',gap:8,marginBottom:4,flexWrap:'wrap' }}>
                           <div style={{ fontSize:14,fontWeight:600 }}>{task.task}</div>
-                          <span className="pill pill-blue" style={{ fontSize:10 }}>{task.printer}</span>
+                          <span className={`pill ${task.printer==='P1S'?'pill-blue':'pill-purple'}`} style={{ fontSize:10 }}>{task.printer}</span>
                           <span style={{ fontSize:11,color:'var(--text-tertiary)' }}>{task.interval_label}</span>
                         </div>
                         <div style={{ fontSize:12,color:'var(--text-secondary)',lineHeight:1.5,marginBottom:8 }}>{task.instructions}</div>
@@ -317,50 +328,63 @@ export default function PartsPage() {
 
       {/* Add Part Modal */}
       {showAdd && (
-        <Modal title="Add Part from Catalogue" width={680} onClose={() => setShowAdd(false)}>
+        <Modal title="Add Part from Catalogue" width={720} onClose={() => setShowAdd(false)}>
+          {/* Filters */}
           <div style={{ display:'flex',gap:8,marginBottom:16,flexWrap:'wrap' }}>
-            <input className="input" placeholder="Search parts..." style={{ flex:1,minWidth:200 }}
+            <input className="input" placeholder="Search parts..." style={{ flex:1,minWidth:180 }}
               value={search} onChange={e => setSearch(e.target.value)} autoFocus />
-            <select className="select" style={{ width:180 }} value={catFilter} onChange={e => setCatFilter(e.target.value)}>
+            <select className="select" style={{ width:200 }} value={catFilter} onChange={e => setCatFilter(e.target.value)}>
               <option value="">All Categories</option>
               {categories.map(c => <option key={c}>{c}</option>)}
             </select>
             <select className="select" style={{ width:130 }} value={printerFilter} onChange={e => setPrinterFilter(e.target.value)}>
               <option value="">All Printers</option>
-              <option>P1S</option><option>H2D</option>
+              <option value="P1S">P1S</option>
+              <option value="H2C">H2C</option>
             </select>
           </div>
-          <div style={{ maxHeight:480,overflowY:'auto',display:'flex',flexDirection:'column',gap:8 }}>
+
+          {/* Results */}
+          <div style={{ maxHeight:500,overflowY:'auto',display:'flex',flexDirection:'column',gap:8 }}>
             {catalogueFiltered.map(p => {
               const inStock = inventory.find(i => i.name === p.name);
               return (
                 <div key={p.sku} style={{ display:'flex',alignItems:'center',gap:12,padding:'12px 14px',borderRadius:'var(--r-sm)',background:'var(--bg-hover)',border:'0.5px solid var(--border)' }}>
-                  <div style={{ fontSize:20,flexShrink:0 }}>{p.categoryIcon}</div>
+                  <PartImage img={p.img} icon={p.categoryIcon} size={52} />
                   <div style={{ flex:1,minWidth:0 }}>
-                    <div style={{ fontSize:13,fontWeight:500 }}>{p.name}</div>
-                    <div style={{ fontSize:10,color:'var(--text-tertiary)',fontFamily:'monospace' }}>{p.sku}</div>
-                    <div style={{ fontSize:11,color:'var(--text-secondary)',marginTop:1 }}>{p.notes}</div>
-                    <div style={{ display:'flex',gap:4,marginTop:3 }}>
-                      {p.compatible.map(c => <span key={c} className="pill pill-blue" style={{ fontSize:9 }}>{c}</span>)}
+                    <div style={{ fontSize:13,fontWeight:500,marginBottom:2 }}>{p.name}</div>
+                    <div style={{ fontSize:10,color:'var(--text-tertiary)',fontFamily:'monospace',marginBottom:3 }}>{p.sku}</div>
+                    <div style={{ fontSize:11,color:'var(--text-secondary)',marginBottom:4,lineHeight:1.4 }}>{p.notes}</div>
+                    <div style={{ display:'flex',gap:4 }}>
+                      {p.compatible.map(c => (
+                        <span key={c} className={`pill ${c==='P1S'?'pill-blue':'pill-purple'}`} style={{ fontSize:9 }}>{c}</span>
+                      ))}
+                      <span className="pill pill-grey" style={{ fontSize:9 }}>{p.category}</span>
                     </div>
                   </div>
-                  <div style={{ textAlign:'right',flexShrink:0 }}>
+                  <div style={{ textAlign:'right',flexShrink:0,minWidth:90 }}>
                     <div style={{ fontSize:15,fontWeight:700,color:'var(--accent)' }}>${p.price_cad.toFixed(2)}</div>
-                    <div style={{ fontSize:10,color:'var(--text-tertiary)' }}>+HST</div>
+                    <div style={{ fontSize:10,color:'var(--text-tertiary)',marginBottom:4 }}>CAD + HST</div>
+                    {p.url && (
+                      <button className="btn btn-ghost btn-sm" style={{ fontSize:9,padding:'2px 6px',marginBottom:4 }}
+                        onClick={() => window.printflow.openExternal(p.url)}>
+                        Bambu ↗
+                      </button>
+                    )}
                     {inStock ? (
                       <>
-                        <div style={{ fontSize:11,color:'var(--green)',marginTop:4 }}>✓ {inStock.quantity} in stock</div>
-                        <button className="btn btn-secondary btn-sm" style={{ marginTop:4 }} onClick={() => addFromCatalogue(p)}>+1 More</button>
+                        <div style={{ fontSize:11,color:'var(--green)',marginBottom:4 }}>✓ {inStock.quantity} in stock</div>
+                        <button className="btn btn-secondary btn-sm" onClick={() => addFromCatalogue(p)}>+1 More</button>
                       </>
                     ) : (
-                      <button className="btn btn-primary btn-sm" style={{ marginTop:6 }} onClick={() => addFromCatalogue(p)}>Add</button>
+                      <button className="btn btn-primary btn-sm" onClick={() => addFromCatalogue(p)}>Add</button>
                     )}
                   </div>
                 </div>
               );
             })}
             {catalogueFiltered.length === 0 && (
-              <div style={{ textAlign:'center',padding:32,color:'var(--text-tertiary)' }}>No parts match your search</div>
+              <div style={{ textAlign:'center',padding:32,color:'var(--text-tertiary)' }}>No parts match your filters</div>
             )}
           </div>
         </Modal>
