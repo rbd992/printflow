@@ -3,6 +3,22 @@
 
 export const CHANGELOG = [
   {
+    version: '1.0.17',
+    date: '2026-04-07',
+    title: 'Camera MJPEG Fix & Bambu Cloud Login Fix',
+    highlights: [
+      'H2C camera now displays live feed — fixed MJPEG frame parser',
+      'Bambu Cloud login fixed for accounts with empty tfaKey in newer API',
+      'GitHub Actions updated to Node.js 24 compatible action versions',
+    ],
+    changes: [
+      { type: 'fix',     text: 'Camera — MJPEG parser now uses Content-Length header to extract frames instead of scanning for JPEG markers, which was unreliable across network chunks' },
+      { type: 'fix',     text: 'Bambu Cloud — login now correctly detects verifyCode flow even when tfaKey is an empty string (newer Bambu API behaviour)' },
+      { type: 'fix',     text: 'Bambu Cloud — verify step now passes email as identifier when tfaKey is empty' },
+      { type: 'improve', text: 'GitHub Actions — updated checkout, setup-node, upload-artifact to v5/v5/v6 for Node.js 24 compatibility ahead of June 2026 deadline' },
+    ],
+  },
+  {
     version: '1.0.15',
     date: '2026-04-07',
     title: 'Camera Fix & Bambu Cloud Verify Fix',

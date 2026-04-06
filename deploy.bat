@@ -162,6 +162,12 @@ if "!NEW_VER!"=="" (
 REM Update version in package.json using Node.js
 node -e "var fs=require('fs'),p=JSON.parse(fs.readFileSync('package.json','utf8'));p.version='!NEW_VER!';fs.writeFileSync('package.json',JSON.stringify(p,null,2)+'\n');console.log('  package.json -> v!NEW_VER!');"
 
+REM Auto-update version strings in AppShell.js and LoginPage.js
+node -e "var fs=require('fs');['src/renderer/pages/AppShell.js','src/renderer/pages/LoginPage.js'].forEach(function(f){var s=fs.readFileSync(f,'utf8');var u=s.replace(/v1\.\d+\.\d+(?= [·\\u00b7])/g,'v!NEW_VER!').replace(/v1\.\d+\.\d+(?=\\n)/g,'v!NEW_VER!').replace(/(v)1\.\d+\.\d+(?=')/g,'$1!NEW_VER!');fs.writeFileSync(f,u);console.log('  '+f+' -> v!NEW_VER!');});"
+
+REM Stage updated files
+git add src/renderer/pages/AppShell.js src/renderer/pages/LoginPage.js
+
 REM Commit the version bump
 git add package.json
 git commit -m "v!NEW_VER! release"
