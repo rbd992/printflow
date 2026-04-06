@@ -19,9 +19,10 @@ const bambuCloudRoutes   = require('./routes/bambuCloud');
 const shippingRoutes     = require('./routes/shipping');
 const settingsRoutes     = require('./routes/settings');
 const shopifyRoutes      = require('./routes/shopify');
-const updatesRoutes      = require('./routes/updates');
-const jobsRoutes         = require('./routes/jobs');
-const customersRoutes    = require('./routes/customers');
+const updatesRoutes       = require('./routes/updates');
+const jobsRoutes          = require('./routes/jobs');
+const customersRoutes     = require('./routes/customers');
+const notificationsRoutes = require('./routes/notifications');
 
 const app = express();
 
@@ -77,6 +78,7 @@ app.use('/api/shopify',       shopifyRoutes);
 app.use('/updates',           updatesRoutes);
 app.use('/api/jobs',          jobsRoutes);
 app.use('/api/customers',     customersRoutes);
+app.use('/api/notifications', notificationsRoutes);
 
 // ── Health check ────────────────────────────────────────────────
 app.get('/health', (req, res) => {

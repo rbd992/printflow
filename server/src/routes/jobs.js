@@ -3,6 +3,21 @@ const router = require('express').Router();
 const { getDb } = require('../db/connection');
 const { authenticate } = require('../middleware/auth');
 
+async function notifyJobStage(job, stage) {
+  try {
+    const db = getDb();
+    const row = db.prepare("SELECT value FROM app_settings WHERE key = 'ntfy_config'").get();
+    const config = row ? JSON.parse(row.value) : null;
+    if (!config?.enabled || !config?.topic) return;
+    const { sendNtfy } = require('./notifications');
+    if (stage === 'done') {
+      await sendNtfy(config.topic, 'Print Complete ✅', `"${job.job_name}" finished printing!`, 'white_check_mark', 'default');
+    } else if (stage === 'failed') {
+      await sendNtfy(config.topic, 'Print Failed ❌', `"${job.job_name}" failed — check the printer`, 'x,printer', 'high');
+    }
+  } catch {}
+}
+
 function ensureTable() {
   getDb().exec(`
     CREATE TABLE IF NOT EXISTS print_jobs (
@@ -81,6 +96,7 @@ router.put('/:id', authenticate, (req, res) => {
       file_name || null, notes || null, stage || 'queued',
       priority || 1, started_at || null, completed_at || null, req.params.id);
     const job = getDb().prepare('SELECT * FROM print_jobs WHERE id = ?').get(req.params.id);
+    notifyJobStage(job, stage || 'queued');
     res.json(job);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });

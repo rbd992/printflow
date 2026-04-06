@@ -111,3 +111,9 @@ export const shopifyApi = {
   proxy: (storeUrl, apiKey, path, method = 'GET', body) =>
     api.post('/api/shopify/proxy', { storeUrl, apiKey, path, method, body }),
 };
+
+export const notificationsApi = {
+  getConfig: ()                               => api.get('/api/notifications/config'),
+  test:      (topic)                          => api.post('/api/notifications/test', { topic }),
+  send:      (title, message, tags, priority) => api.post('/api/notifications/send', { title, message, tags, priority }),
+};

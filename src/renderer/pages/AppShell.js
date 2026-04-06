@@ -146,7 +146,7 @@ export default function AppShell({ theme, onThemeChange }) {
           <img src="/icon.png" alt="PrintFlow" style={{ width:32,height:32,borderRadius:9,flexShrink:0 }} onError={e=>{e.target.style.display='none';}} />
           <div>
             <div style={{ fontSize:13,fontWeight:700,letterSpacing:'-0.01em' }}>PrintFlow</div>
-            <div style={{ fontSize:10,color:'var(--text-tertiary)',textTransform:'capitalize' }}>v1.0.6 · {role}</div>
+            <div style={{ fontSize:10,color:'var(--text-tertiary)',textTransform:'capitalize' }}>v1.0.7 · {role}</div>
           </div>
         </div>
 
