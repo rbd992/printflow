@@ -145,7 +145,6 @@ function streamRtsps(res, ip, accessCode, serial) {
   ]);
 
   let frameBuf = Buffer.alloc(0);
-  const CRLF   = Buffer.from('\r\n');
   const SOI    = Buffer.from([0xFF, 0xD8]);
   const EOI    = Buffer.from([0xFF, 0xD9]);
 

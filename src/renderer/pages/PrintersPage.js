@@ -2,7 +2,6 @@ import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { api, getServerUrl } from '../api/client';
 import { onSocketEvent } from '../api/socket';
 import { useAuthStore } from '../stores/authStore';
-import { CHANGELOG } from '../data/changelog'; // used in AppShell, imported here for bundle
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 function Modal({ title, onClose, children, width=480 }) {
@@ -239,7 +238,7 @@ function CameraFeed({ printer, token }) {
       setFrameCount(0);
       frameCountRef.current = 0;
     })();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+  // eslint-disable-next-line
   }, [streamUrl, token]);
 
   const stopStream = useCallback(() => {
