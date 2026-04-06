@@ -194,6 +194,41 @@ export default function OrdersPage() {
     finally { setSaving(false); }
   }
 
+  async function duplicateOrder(order) {
+    setSaving(true);
+    try {
+      const payload = {
+        customer_name: order.customer_name,
+        customer_email: order.customer_email,
+        customer_phone: order.customer_phone,
+        description: order.description,
+        platform: order.platform || 'direct',
+        price_cad: order.price_cad || 0,
+        status: 'new',
+        notes: order.notes,
+      };
+      await ordersApi.create(payload);
+      setEditing(null);
+      await load();
+    } catch(e) { setErr(e.response?.data?.error || 'Duplicate failed'); }
+    finally { setSaving(false); }
+  }
+
+  function exportCSV() {
+    const headers = ['Order #','Customer','Email','Description','Platform','Price','Status','Tracking','Date'];
+    const rows = filtered.map(o => [
+      o.order_number, o.customer_name, o.customer_email || '', o.description || '',
+      o.platform || '', (o.price_cad || 0).toFixed(2), o.status,
+      o.tracking_number || '', o.created_at?.slice(0,10) || '',
+    ]);
+    const csv = [headers, ...rows].map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'orders.csv'; a.click();
+    URL.revokeObjectURL(url);
+  }
+
   async function deleteOrder(order) {
     if(!window.confirm(`Delete order "${order.order_number}" for ${order.customer_name}?\n\nThis will also delete all associated transactions and financial records. This cannot be undone.`)) return;
     try {
@@ -223,6 +258,7 @@ export default function OrdersPage() {
             <p style={{ color:'var(--text-secondary)',fontSize:13,marginTop:4 }}>{orders.length} orders · ${revenue.toFixed(2)} total</p>
           </div>
           {canManage && <button className="btn btn-primary" onClick={openNew}>+ New Order</button>}
+          <button className="btn btn-secondary" onClick={exportCSV}>⬇ CSV</button>
         </div>
 
         {/* Metrics */}
@@ -343,6 +379,9 @@ export default function OrdersPage() {
                 <div>
                   {editing?.id && isOwner && (
                     <button className="btn btn-danger btn-sm" onClick={()=>deleteOrder(editing)}>Delete Order</button>
+                  )}
+                  {editing?.id && canManage && (
+                    <button className="btn btn-secondary btn-sm" onClick={()=>duplicateOrder(editing)}>⧉ Duplicate</button>
                   )}
                 </div>
                 <div style={{ display:'flex',gap:8 }}>

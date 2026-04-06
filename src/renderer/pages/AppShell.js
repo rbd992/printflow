@@ -64,6 +64,27 @@ export default function AppShell({ theme, onThemeChange }) {
   const isMac = window.printflow.platform === 'darwin';
   const role  = user?.role || 'operator';
 
+  // Global keyboard shortcuts
+  useEffect(() => {
+    function handleKey(e) {
+      const mod = e.metaKey || e.ctrlKey;
+      if (!mod) return;
+      // Don't intercept when typing in an input
+      if (['INPUT','TEXTAREA','SELECT'].includes(e.target.tagName)) return;
+      switch(e.key) {
+        case '1': e.preventDefault(); navigate('/'); break;
+        case '2': e.preventDefault(); navigate('/orders'); break;
+        case '3': e.preventDefault(); navigate('/queue'); break;
+        case '4': e.preventDefault(); navigate('/printers'); break;
+        case '5': e.preventDefault(); navigate('/filament'); break;
+        case 'k': e.preventDefault(); navigate('/orders'); break; // Cmd+K → orders (quick access)
+        default: break;
+      }
+    }
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, [navigate]);
+
   useEffect(() => {
     const u1 = onSocketEvent('filament:updated', s => { if(s.is_low) setLowFilament(n=>n+1); });
     const u2 = onSocketEvent('order:created', () => setPendingOrders(n=>n+1));
@@ -140,7 +161,9 @@ export default function AppShell({ theme, onThemeChange }) {
           <SidebarSection label="Operations">
             <NavItem to="/orders"    icon="📦" label="Orders"           badge={pendingOrders} userRole={role} />
             <NavItem to="/queue"     icon="⏳" label="Job Queue"        userRole={role} />
+            <NavItem to="/history"   icon="📜" label="Print History"    userRole={role} />
             <NavItem to="/customers" icon="👥" label="Customers"        userRole={role} />
+            <NavItem to="/quotes"    icon="🧾" label="Quotes & Invoices" minRole="manager" userRole={role} />
             <NavItem to="/printers"  icon={<PrinterNav />} label="Printers" userRole={role} />
             <NavItem to="/shipping" icon="🚚" label="Shipping"   minRole="manager" userRole={role} />
             <NavItem to="/vendors"  icon="🛒" label="Vendors"    userRole={role} />

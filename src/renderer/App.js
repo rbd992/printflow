@@ -21,9 +21,11 @@ import UsersPage     from './pages/UsersPage';
 import SettingsPage  from './pages/SettingsPage';
 import ModelsPage    from './pages/ModelsPage';
 import DesignPage    from './pages/DesignPage';
-import ChangelogPage from './pages/ChangelogPage';
-import JobQueuePage  from './pages/JobQueuePage';
-import CustomersPage from './pages/CustomersPage';
+import ChangelogPage    from './pages/ChangelogPage';
+import JobQueuePage     from './pages/JobQueuePage';
+import CustomersPage    from './pages/CustomersPage';
+import QuotePage        from './pages/QuotePage';
+import PrintHistoryPage from './pages/PrintHistoryPage';
 
 function AuthGuard({ children, roles }) {
   const { token, user } = useAuthStore();
@@ -81,6 +83,8 @@ export default function App() {
           <Route path="orders"    element={<OrdersPage />} />
           <Route path="queue"     element={<JobQueuePage />} />
           <Route path="customers" element={<CustomersPage />} />
+          <Route path="history"   element={<PrintHistoryPage />} />
+          <Route path="quotes"    element={<AuthGuard roles={['owner','manager']}><QuotePage /></AuthGuard>} />
           <Route path="printers"  element={<PrintersPage />} />
           <Route path="vendors"   element={<VendorsPage />} />
           <Route path="shipping"  element={<AuthGuard roles={['owner','manager']}><ShippingPage /></AuthGuard>} />

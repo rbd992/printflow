@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
-import { authApi } from '../api/client';
+import { authApi, settingsApi } from '../api/client';
 
 export default function SettingsPage({ onThemeChange }) {
   const { user, serverUrl, setServerUrl, logout } = useAuthStore();
@@ -12,10 +12,14 @@ export default function SettingsPage({ onThemeChange }) {
   const [pwMsg, setPwMsg]       = useState('');
   const [pwErr, setPwErr]       = useState('');
   const [saving, setSaving]     = useState(false);
+  const [ntfy, setNtfy]         = useState({ topic: '', enabled: false });
+  const [ntfySaved, setNtfySaved] = useState(false);
+  const [ntfyTesting, setNtfyTesting] = useState(false);
 
   useEffect(() => {
     window.printflow.getTheme().then(t => setThemeLocal(t || 'dark'));
     setNewUrl(serverUrl);
+    settingsApi.get('ntfy_config').then(r => { if (r.data?.value) setNtfy(r.data.value); }).catch(() => {});
   }, [serverUrl]);
 
   async function changeTheme(t) {
@@ -48,6 +52,26 @@ export default function SettingsPage({ onThemeChange }) {
     } finally {
       setSaving(false);
     }
+  }
+
+  async function saveNtfy() {
+    await settingsApi.set('ntfy_config', ntfy);
+    setNtfySaved(true);
+    setTimeout(() => setNtfySaved(false), 2000);
+  }
+
+  async function testNtfy() {
+    if (!ntfy.topic) return;
+    setNtfyTesting(true);
+    try {
+      await fetch(`https://ntfy.sh/${ntfy.topic}`, {
+        method: 'POST',
+        body: 'PrintFlow test notification ✅',
+        headers: { 'Title': 'PrintFlow', 'Priority': 'default', 'Tags': 'printer' },
+      });
+      alert('Test notification sent! Check your ntfy app.');
+    } catch { alert('Failed to send test notification'); }
+    setNtfyTesting(false);
   }
 
   const integrations = [
@@ -142,7 +166,34 @@ export default function SettingsPage({ onThemeChange }) {
         </div>
 
         <div className="card" style={{ padding: 20, marginBottom: 14 }}>
-          <h3 style={{ marginBottom: 14 }}>Integrations</h3>
+          <h3 style={{ marginBottom: 6 }}>Push Notifications</h3>
+          <p style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 14, lineHeight: 1.6 }}>
+            Get notified on your phone when prints finish or fail. Uses <strong>ntfy.sh</strong> — free, no account needed.
+            Install the <a href="#" onClick={() => window.printflow.openExternal('https://ntfy.sh')} style={{ color: 'var(--accent)' }}>ntfy app</a> and choose a unique topic name.
+          </p>
+          <div className="form-row">
+            <div className="form-group" style={{ flex: 2 }}>
+              <label className="label">ntfy Topic (your unique channel name)</label>
+              <input className="input" value={ntfy.topic} onChange={e => setNtfy(n => ({ ...n, topic: e.target.value }))}
+                placeholder="e.g. alliston3dprints-rob" style={{ fontFamily: 'monospace' }} />
+              <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 4 }}>Subscribe to this topic in the ntfy app on your phone</div>
+            </div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+            <input type="checkbox" id="ntfy-enabled" checked={ntfy.enabled} onChange={e => setNtfy(n => ({ ...n, enabled: e.target.checked }))} style={{ width: 16, height: 16 }} />
+            <label htmlFor="ntfy-enabled" style={{ fontSize: 13, cursor: 'pointer' }}>Enable push notifications</label>
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button className="btn btn-primary btn-sm" onClick={saveNtfy} disabled={!ntfy.topic}>
+              {ntfySaved ? '✓ Saved' : 'Save'}
+            </button>
+            <button className="btn btn-secondary btn-sm" onClick={testNtfy} disabled={!ntfy.topic || ntfyTesting}>
+              {ntfyTesting ? 'Sending...' : '🔔 Send Test'}
+            </button>
+          </div>
+        </div>
+
+        <div className="card" style={{ padding: 20, marginBottom: 14 }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {integrations.map(i => (
               <div key={i.name} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px', background: 'var(--bg-hover)', borderRadius: 'var(--r-sm)' }}>
