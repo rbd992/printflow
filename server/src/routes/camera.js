@@ -208,15 +208,8 @@ router.get('/:serial/stream', (req, res) => {
     return res.status(400).json({ error: 'No camera IP or access code configured for this printer' });
   }
 
-  // Stop any existing stream for this printer first
-  const existing = activeStreams.get(serial);
-  if (existing) {
-    try {
-      if (existing.type === 'tcp') existing.socket.destroy();
-      if (existing.type === 'ffmpeg' && !existing.proc.killed) existing.proc.kill('SIGTERM');
-    } catch {}
-    activeStreams.delete(serial);
-  }
+  // Note: we no longer kill existing streams when a new viewer connects
+  // This allows both the card view and popout to stream simultaneously
 
   // Set MJPEG response headers
   res.setHeader('Content-Type', 'multipart/x-mixed-replace; boundary=frame');

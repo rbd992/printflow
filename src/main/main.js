@@ -204,6 +204,8 @@ ipcMain.handle('token:set', (_, token) => {
 ipcMain.handle('token:clear', () => { store.delete('authToken'); });
 
 ipcMain.on('camera:popout', (_, { serial, name, streamUrl }) => {
+  const os = require('os');
+  const fs = require('fs');
   const popup = new BrowserWindow({
     width: 1280, height: 720, minWidth: 640, minHeight: 360,
     title: `${name} — Camera`,
@@ -275,8 +277,11 @@ fetch('${streamUrl}').then(function(r){
 <\/script>
 </body></html>`;
 
-  popup.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html));
+  const tmp = path.join(os.tmpdir(), `printflow-cam-${serial}.html`);
+  fs.writeFileSync(tmp, html, 'utf8');
+  popup.loadFile(tmp);
   popup.setMenu(null);
+  popup.on('closed', () => { try { fs.unlinkSync(tmp); } catch {} });
 });
 
 
