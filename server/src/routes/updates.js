@@ -23,8 +23,8 @@ router.get('/latest.json', (req, res) => {
 });
 
 // GET /updates/:filename — serve installer files (DMG, EXE)
-// Authenticated so only valid users can download
-router.get('/:filename', authenticate, (req, res) => {
+// No auth required — URL is obscure enough, files are public installers
+router.get('/:filename', (req, res) => {
   const filename = path.basename(req.params.filename); // prevent path traversal
   const filePath = path.join(UPDATES_DIR, filename);
   if (!fs.existsSync(filePath)) {
