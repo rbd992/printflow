@@ -3,6 +3,32 @@
 
 export const CHANGELOG = [
   {
+    version: '1.0.13',
+    date: '2026-04-07',
+    title: 'Parts Catalogue — P1S & H2C Rebuilt',
+    highlights: [
+      'Parts catalogue completely rebuilt with real Bambu CA store products',
+      'P1S and H2C parts now properly separated — no more shared tags',
+      'Real product images from Bambu Lab CDN on every part',
+      'H2C Vortek induction hotends added as their own category',
+      'H2C-specific build plates noted as not interchangeable with H2D',
+      'Maintenance schedule updated: H2D → H2C throughout',
+    ],
+    changes: [
+      { type: 'new',     text: 'Parts — Real product images from ca.store.bambulab.com CDN on every catalogue item' },
+      { type: 'new',     text: 'Parts — H2C Vortek Induction Hotends category: Standard Flow, High Flow, Tungsten Carbide, Hotend Combo' },
+      { type: 'new',     text: 'Parts — H2C Standard Hotends (left-side): 0.2mm SS, 0.4mm HS, 0.6mm HS, Heating Assembly' },
+      { type: 'new',     text: 'Parts — H2C AMS & Multi-Material: AMS 2 Pro Switching Adapter, 4-in-1 PTFE Adapter, Bus Cable, Desiccants' },
+      { type: 'new',     text: 'Parts — H2C Upgrades: Vision Encoder, Toolhead Enhanced Cooling Fan, TPU High-Flow Kit' },
+      { type: 'new',     text: 'Parts — P1S build plates: 7 plates including Cool Plate SuperTack, SuperTack Pro, Textured PEI, Smooth PEI, Dual-Texture PEI, Engineering Plate, 3D Effect Plate' },
+      { type: 'fix',     text: 'Parts — All H2D references corrected to H2C throughout the catalogue and maintenance schedule' },
+      { type: 'fix',     text: 'Parts — Printer filter now shows P1S and H2C (was P1S and H2D)' },
+      { type: 'fix',     text: 'Parts — H2C build plates correctly noted as NOT interchangeable with H2D due to different bed size' },
+      { type: 'improve', text: 'Parts — Maintenance schedule expanded with H2C-specific tasks: Vortek dock inspection, dual toolhead calibration, AMS HT molecular sieve' },
+      { type: 'improve', text: 'Parts — Part cards now show product image with emoji icon fallback, and Buy on Bambu link' },
+    ],
+  },
+  {
     version: '1.0.12',
     date: '2026-04-07',
     title: 'Printer Edit Fix, Release Notes & About',
