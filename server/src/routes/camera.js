@@ -208,8 +208,7 @@ router.get('/:serial/stream', (req, res) => {
     return res.status(400).json({ error: 'No camera IP or access code configured for this printer' });
   }
 
-  // Note: we no longer kill existing streams when a new viewer connects
-  // This allows both the card view and popout to stream simultaneously
+  const streamId = `${serial}_${Date.now()}`;
 
   // Set MJPEG response headers
   res.setHeader('Content-Type', 'multipart/x-mixed-replace; boundary=frame');
@@ -227,14 +226,16 @@ router.get('/:serial/stream', (req, res) => {
     handle = streamRtsps(res, cameraIp, cameraCode, serial);
   }
 
+  activeStreams.set(streamId, { type: protocol === 'jpeg_tcp' ? 'tcp' : 'ffmpeg', handle });
+
   // Clean up when client disconnects
   req.on('close', () => {
-    logger.info(`[Camera:${serial}] Client disconnected`);
+    logger.info(`[Camera:${serial}] Client disconnected (${streamId})`);
+    activeStreams.delete(streamId);
     try {
       if (protocol === 'jpeg_tcp' && handle && !handle.destroyed) handle.destroy();
       if (protocol === 'rtsps' && handle && !handle.killed) handle.kill('SIGTERM');
     } catch {}
-    activeStreams.delete(serial);
   });
 });
 

@@ -227,6 +227,11 @@ function CameraFeed({ printer, token }) {
           buf = buf.slice(frameEnd);
         }
       }
+      // Stream ended naturally — reconnect after brief pause
+      if (!controller.signal.aborted) {
+        await new Promise(r => setTimeout(r, 1500));
+        if (!controller.signal.aborted) startStream();
+      }
     } catch (err) {
       if (err.name === 'AbortError') return;
       setError(err.message || 'Camera connection failed');

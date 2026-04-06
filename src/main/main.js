@@ -206,9 +206,10 @@ ipcMain.handle('token:clear', () => { store.delete('authToken'); });
 ipcMain.on('camera:popout', (_, { serial, name, streamUrl }) => {
   const os = require('os');
   const fs = require('fs');
+
   const popup = new BrowserWindow({
     width: 1280, height: 720, minWidth: 640, minHeight: 360,
-    title: `${name} — Camera`,
+    title: `${name} \u2014 Camera`,
     backgroundColor: '#000000',
     webPreferences: {
       nodeIntegration: false,
@@ -217,67 +218,73 @@ ipcMain.on('camera:popout', (_, { serial, name, streamUrl }) => {
     },
   });
 
-  // Self-contained MJPEG viewer page
+  // Allow file:// page to fetch from local NAS (mixed content)
+  popup.webContents.session.webRequest.onHeadersReceived((details, callback) => {
+    callback({
+      responseHeaders: {
+        ...details.responseHeaders,
+        'Access-Control-Allow-Origin': ['*'],
+        'Content-Security-Policy': [
+          "default-src 'self' 'unsafe-inline' 'unsafe-eval' blob: http://10.0.0.219:3001 http://100.68.105.76:3001",
+        ],
+      },
+    });
+  });
+
+  const tmp = path.join(os.tmpdir(), `printflow-cam-${serial}.html`);
+
   const html = `<!DOCTYPE html>
 <html><head>
 <meta charset="utf-8">
-<title>${name} — Camera</title>
+<title>${name} \u2014 Camera</title>
 <style>
 * { margin:0; padding:0; box-sizing:border-box; background:#000; }
-body { display:flex; flex-direction:column; height:100vh; overflow:hidden; font-family:sans-serif; }
-#bar { height:32px; background:#111; display:flex; align-items:center; padding:0 12px; gap:8px; flex-shrink:0; -webkit-app-region:drag; }
-#bar span { color:#fff; font-size:12px; font-weight:600; opacity:0.8; }
-#badge { background:#e53935; color:#fff; font-size:9px; font-weight:700; padding:2px 6px; border-radius:3px; letter-spacing:0.05em; }
-#frames { color:#aaa; font-size:10px; }
-#wrap { flex:1; display:flex; align-items:center; justify-content:center; overflow:hidden; }
-canvas { max-width:100%; max-height:100%; object-fit:contain; display:block; }
+body { display:flex; flex-direction:column; height:100vh; overflow:hidden; font-family:-apple-system,sans-serif; }
+#bar { height:36px; background:#111; display:flex; align-items:center; padding:0 14px; gap:10px; flex-shrink:0; -webkit-app-region:drag; user-select:none; }
+#badge { background:#e53935; color:#fff; font-size:9px; font-weight:700; padding:2px 7px; border-radius:3px; letter-spacing:0.06em; }
+#title { color:#fff; font-size:13px; font-weight:600; }
+#info { color:#666; font-size:11px; margin-left:auto; }
+#wrap { flex:1; display:flex; align-items:center; justify-content:center; background:#000; }
+canvas { max-width:100%; max-height:100%; object-fit:contain; }
 </style>
 </head><body>
 <div id="bar">
   <span id="badge">LIVE</span>
-  <span>${name}</span>
-  <span id="frames">Connecting...</span>
+  <span id="title">${name}</span>
+  <span id="info">Connecting...</span>
 </div>
 <div id="wrap"><canvas id="c"></canvas></div>
 <script>
 var canvas=document.getElementById('c');
-var framesEl=document.getElementById('frames');
-var decoder=new TextDecoder();
-var buf=new Uint8Array(0);
-var frames=0;
-function append(a,b){var n=new Uint8Array(a.length+b.length);n.set(a);n.set(b,a.length);return n;}
-function find(h,n,f){f=f||0;outer:for(var i=f;i<=h.length-n.length;i++){for(var j=0;j<n.length;j++)if(h[i+j]!==n[j])continue outer;return i;}return -1;}
-var CRLF2=new Uint8Array([13,10,13,10]);
+var info=document.getElementById('info');
+var dec=new TextDecoder(),buf=new Uint8Array(0),frames=0;
+function cat(a,b){var n=new Uint8Array(a.length+b.length);n.set(a);n.set(b,a.length);return n;}
+function idx(h,n,f){f=f||0;o:for(var i=f;i<=h.length-n.length;i++){for(var j=0;j<n.length;j++)if(h[i+j]!==n[j])continue o;return i;}return -1;}
+var D=new Uint8Array([13,10,13,10]);
 fetch('${streamUrl}').then(function(r){
-  if(!r.ok){framesEl.textContent='Error: HTTP '+r.status;return;}
-  framesEl.textContent='0 frames';
-  var reader=r.body.getReader();
-  function read(){reader.read().then(function(d){
-    if(d.done){framesEl.textContent='Stream ended';return;}
-    buf=append(buf,d.value);
-    while(true){
-      var he=find(buf,CRLF2);
-      if(he===-1)break;
-      var ht=decoder.decode(buf.slice(0,he));
-      var m=ht.match(/Content-Length:\s*(\d+)/i);
-      if(!m){buf=buf.slice(he+4);continue;}
-      var fl=parseInt(m[1]),fs=he+4,fe=fs+fl;
-      if(buf.length<fe)break;
-      var fb=buf.slice(fs,fe);buf=buf.slice(fe);
+  if(!r.ok){info.textContent='HTTP '+r.status;return;}
+  info.textContent='0 frames';
+  var rd=r.body.getReader();
+  (function read(){rd.read().then(function(d){
+    if(d.done){info.textContent='Stream ended';return;}
+    buf=cat(buf,d.value);
+    for(;;){
+      var he=idx(buf,D);if(he===-1)break;
+      var ht=dec.decode(buf.slice(0,he));
+      var m=ht.match(/Content-Length:\s*(\d+)/i);if(!m){buf=buf.slice(he+4);continue;}
+      var fl=parseInt(m[1]),fs2=he+4,fe=fs2+fl;if(buf.length<fe)break;
+      var fb=buf.slice(fs2,fe);buf=buf.slice(fe);
       createImageBitmap(new Blob([fb],{type:'image/jpeg'})).then(function(bm){
         canvas.width=bm.width;canvas.height=bm.height;
         canvas.getContext('2d').drawImage(bm,0,0);bm.close();
-        framesEl.textContent=(++frames)+' frames';
+        info.textContent=(++frames)+' frames';
       });
     }
     read();
-  }).catch(function(){framesEl.textContent='Connection lost';});}
-  read();
-}).catch(function(e){framesEl.textContent='Failed: '+e.message;});
-<\/script>
-</body></html>`;
+  }).catch(function(e){info.textContent='Lost: '+e.message;});})();
+}).catch(function(e){info.textContent='Error: '+e.message;});
+<\/script></body></html>`;
 
-  const tmp = path.join(os.tmpdir(), `printflow-cam-${serial}.html`);
   fs.writeFileSync(tmp, html, 'utf8');
   popup.loadFile(tmp);
   popup.setMenu(null);
