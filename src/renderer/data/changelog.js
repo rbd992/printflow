@@ -3,7 +3,7 @@
 
 export const CHANGELOG = [
   {
-    version: '1.0.9.1',
+    version: '1.0.10',
     date: '2026-04-07',
     title: 'Camera Config, Logo Fix & Stability',
     highlights: [
