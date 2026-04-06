@@ -80,19 +80,22 @@ async function requestLoginCode(email, password) {
     body:   { account: email, password },
   });
 
-  // If login succeeds without 2FA (no tfaKey), return token directly
+  // If login succeeds without 2FA
   if (res.accessToken) {
     logger.info('[BambuCloud] Login succeeded without 2FA');
     return { token: res.accessToken, uid: res.uid, noTfa: true };
   }
 
-  // 2FA required — returns a tfaKey
-  if (res.tfaKey) {
+  // 2FA required — Bambu returns loginType='verifyCode'
+  // tfaKey may be an empty string in newer API versions — check loginType instead
+  if (res.loginType === 'verifyCode' || res.tfaKey !== undefined) {
     logger.info('[BambuCloud] 2FA required — code sent to email');
-    return { tfaKey: res.tfaKey };
+    return { tfaKey: res.tfaKey || '' };
   }
 
-  throw new Error(res.message || 'Login failed — unexpected response');
+  const errMsg = res.message || JSON.stringify(res);
+  logger.error('[BambuCloud] Unexpected login response: ' + errMsg);
+  throw new Error(errMsg || 'Login failed — check your email and password');
 }
 
 /**
@@ -101,12 +104,16 @@ async function requestLoginCode(email, password) {
  * @param {string} code    6-digit code from email
  * @returns {Promise<{token: string, uid: string}>}
  */
-async function submitLoginCode(tfaKey, code) {
+async function submitLoginCode(tfaKey, code, email) {
   logger.info('[BambuCloud] Submitting 2FA code');
+  // When tfaKey is empty, newer Bambu API uses email as identifier
+  const body = tfaKey
+    ? { tfaKey, tfaCode: code }
+    : { account: email, code };
   const res = await bambuRequest({
     method: 'POST',
     path:   '/v1/user-service/user/login',
-    body:   { tfaKey, tfaCode: code },
+    body,
   });
 
   if (res.accessToken && res.uid) {

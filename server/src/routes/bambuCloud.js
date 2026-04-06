@@ -52,7 +52,7 @@ router.post('/verify', authenticate, authorize('owner'), async (req, res) => {
   if (!pending) return res.status(400).json({ error: 'No pending login — start with /cloud/login first' });
 
   try {
-    const { token, uid } = await submitLoginCode(pending.tfaKey, code.trim());
+    const { token, uid } = await submitLoginCode(pending.tfaKey, code.trim(), pending.email);
     pendingAuth.delete(req.user.id);
     await _saveCloudCredentials(req.user.id, uid, token, pending.email);
     res.json({ success: true, message: 'Bambu Cloud connected successfully' });
