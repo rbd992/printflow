@@ -99,11 +99,11 @@ jobs:
             -d "api=SYNO.Docker.Container&version=1&method=restart&name=printflow-server&_sid=$SID")
           echo "Restart response: $RESTART"
 
-          echo "Waiting 20s for container to start..."
-          sleep 20
+          echo "Waiting 30s for container to start..."
+          sleep 30
 
           echo "Health check..."
-          HEALTH=$(curl -s http://10.0.0.219:3001/health 2>/dev/null)
+          HEALTH=$(curl -s --max-time 15 --retry 3 --retry-delay 5 http://100.68.105.76:3001/health 2>/dev/null)
           echo "Health: $HEALTH"
 
           if echo "$HEALTH" | grep -q '"ok"'; then
