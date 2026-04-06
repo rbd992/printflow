@@ -3,6 +3,46 @@
 
 export const CHANGELOG = [
   {
+    version: '1.0.20',
+    date: '2026-04-07',
+    title: 'Camera Stream Fix & Frame Counter',
+    highlights: [
+      'Camera stream stays live — no longer collapses while waiting for frames',
+      'Frame counter shows frames received next to LIVE badge',
+      'Bambu Cloud verify now logs full API response on failure',
+    ],
+    changes: [
+      { type: 'fix',     text: 'Camera — streaming state no longer reset in finally block, canvas stays visible' },
+      { type: 'new',     text: 'Camera — frame counter badge next to LIVE indicator' },
+      { type: 'improve', text: 'Bambu Cloud — full verify response logged on failure for debugging' },
+    ],
+  },
+  {
+    version: '1.0.19',
+    date: '2026-04-07',
+    title: 'Version String Fix',
+    highlights: ['Fixed sidebar version showing 1.0.17 instead of current version'],
+    changes: [
+      { type: 'fix', text: 'AppShell and LoginPage version strings now auto-update with deploy.bat' },
+    ],
+  },
+  {
+    version: '1.0.18',
+    date: '2026-04-07',
+    title: 'Camera MJPEG Parser & Bambu Cloud Login',
+    highlights: [
+      'Camera MJPEG parser uses Content-Length header — reliable frame extraction',
+      'Bambu Cloud login fixed for empty tfaKey in newer API',
+      'GitHub Actions updated to Node.js 24 compatible versions',
+    ],
+    changes: [
+      { type: 'fix',     text: 'Camera — MJPEG parser now uses Content-Length header instead of JPEG marker scan' },
+      { type: 'fix',     text: 'Bambu Cloud — login detects verifyCode flow even with empty tfaKey' },
+      { type: 'fix',     text: 'Bambu Cloud — verify step passes email as identifier when tfaKey is empty' },
+      { type: 'improve', text: 'GitHub Actions — updated to checkout@v5, setup-node@v5, upload-artifact@v6' },
+    ],
+  },
+  {
     version: '1.0.17',
     date: '2026-04-07',
     title: 'Camera MJPEG Fix & Bambu Cloud Login Fix',
