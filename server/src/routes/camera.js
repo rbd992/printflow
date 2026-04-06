@@ -170,7 +170,7 @@ function streamRtsps(res, ip, accessCode, serial) {
     frameBuf = frameBuf.slice(start);
   });
 
-  ffmpeg.stderr.on('data', d => logger.warn(`[Camera:${serial}] ffmpeg: ${d.toString().trim()}`));
+  ffmpeg.stderr.on('data', d => logger.error(`[Camera:${serial}] ffmpeg: ${d.toString().trim()}`));
 
   ffmpeg.on('close', code => {
     logger.info(`[Camera:${serial}] ffmpeg exited (${code})`);
