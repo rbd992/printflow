@@ -130,7 +130,11 @@ function CameraFeed({ printer, token }) {
   function handleLoad() { setLoading(false); }
   function handleError() {
     setLoading(false);
-    setError('Could not connect to camera.\n• Enable "LAN Mode Liveview" in printer Settings → Network\n• Verify the IP and access code are correct\n• ffmpeg must be installed on the server (rebuild via Task Scheduler)');
+    // Fetch the actual error message from the stream endpoint
+    fetch(`${streamUrl}?token=${encodeURIComponent(token)}&t=${Date.now()}`)
+      .then(r => r.json())
+      .then(j => setError(j.error || 'Could not connect to camera'))
+      .catch(() => setError('Could not connect to camera.\n\u2022 Enable "LAN Mode Liveview" in printer Settings \u2192 Network\n\u2022 Check IP and access code in Edit Settings\n\u2022 ffmpeg must be installed (rebuild via DSM Task Scheduler)'));
     setStreaming(false);
   }
 
@@ -238,8 +242,9 @@ function CloudLoginModal({ onClose, onSuccess }) {
         </div>
       ) : (
         <div>
-          <div style={{ padding:'10px 14px',background:'var(--amber-light)',borderRadius:'var(--r-sm)',fontSize:12,color:'var(--amber)',marginBottom:16,lineHeight:1.5 }}>
-            <strong>Note:</strong> LAN Mode is the most stable option. Cloud Mode uses Bambu's unofficial API and may break with firmware updates.
+        <div style={{ padding:'10px 14px',background:'var(--amber-light)',borderRadius:'var(--r-sm)',fontSize:12,color:'var(--amber)',marginBottom:16,lineHeight:1.5 }}>
+            <strong>Note:</strong> LAN Mode is the most stable option. Cloud Mode uses Bambu's unofficial API and may break with firmware updates.<br/>
+            <strong>Apple/Google sign-in:</strong> If you signed up with Apple or Google, you must first set a password at <button className="btn btn-ghost" style={{ fontSize:12,padding:0,color:'var(--accent)',height:'auto' }} onClick={()=>window.printflow.openExternal('https://bambulab.com')}>bambulab.com</button> → Account → Security before logging in here.
           </div>
           <div className="form-group"><label className="label">Bambu Account Email</label><input className="input" type="email" value={email} onChange={e=>setEmail(e.target.value)} autoFocus /></div>
           <div className="form-group"><label className="label">Password</label><input className="input" type="password" value={password} onChange={e=>setPass(e.target.value)} /></div>
