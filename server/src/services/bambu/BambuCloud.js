@@ -106,9 +106,9 @@ async function requestLoginCode(email, password) {
  */
 async function submitLoginCode(tfaKey, code, email) {
   logger.info('[BambuCloud] Submitting 2FA code');
-  // When tfaKey is empty, newer Bambu API uses email as identifier
-  const body = tfaKey
-    ? { tfaKey, tfaCode: code }
+  // When tfaKey is empty string, still send it with tfaCode (not account+code)
+  const body = tfaKey !== undefined
+    ? { tfaKey: tfaKey || '', tfaCode: code }
     : { account: email, code };
   const res = await bambuRequest({
     method: 'POST',
