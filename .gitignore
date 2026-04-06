@@ -3,6 +3,9 @@ build/
 dist/
 .DS_Store
 *.dmg
+# Deploy scripts are tracked
+!deploy.bat
+!deploy.sh
 *.exe
 *.log
 .env
