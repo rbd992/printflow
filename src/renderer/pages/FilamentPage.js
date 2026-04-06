@@ -456,6 +456,9 @@ export default function FilamentPage() {
               </div>
             );
           })()}
+
+          {/* ── CUSTOM / EDIT TAB ── */}
+          {(activeTab === 'custom' || editing.id) && (
             <div>
               <div className="form-row">
                 <div className="form-group"><label className="label">Brand</label><input className="input" {...F('brand')} /></div>

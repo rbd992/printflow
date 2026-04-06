@@ -56,7 +56,15 @@ export default function FinancePage() {
         <div style={{ display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:20 }}>
           <div><h1>Revenue & Expenses</h1><p style={{ color:'var(--text-secondary)',fontSize:13,marginTop:4 }}>Full financial ledger — income, expenses, and margin tracking</p></div>
           <div style={{ display:'flex',gap:8 }}>
-            <button className="btn btn-secondary" onClick={()=>{}}>Export CSV</button>
+            <button className="btn btn-secondary" onClick={()=>{
+              const rows = [['Date','Description','Category','Type','Amount','HST']];
+              transactions.forEach(t=>rows.push([t.date,`"${t.description}"`,t.category,t.type,t.amount_cad?.toFixed(2),t.hst_amount?.toFixed(2)||'0.00']));
+              const csv = rows.map(r=>r.join(',')).join('\n');
+              const blob = new Blob([csv],{type:'text/csv'});
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a'); a.href=url; a.download='transactions.csv'; a.click();
+              URL.revokeObjectURL(url);
+            }}>Export CSV</button>
             <button className="btn btn-primary" onClick={()=>setAdding(true)}>＋ Add Entry</button>
           </div>
         </div>

@@ -3,6 +3,33 @@
 
 export const CHANGELOG = [
   {
+    version: '1.0.11',
+    date: '2026-04-07',
+    title: 'Comprehensive Bug Fixes & Polish',
+    highlights: [
+      'Printer edit modal — change IP, access code, camera settings for existing printers',
+      'Camera credentials now editable per-printer without re-adding it',
+      'Fixed Filament page custom tab always showing regardless of selected tab',
+      'Fixed Finance CSV export button (was wired to nothing)',
+      'Fixed Job Queue customer name not auto-filling when order is selected',
+      'Fixed Customers page losing order-derived customers when manual ones exist',
+      'Quote business info now persisted to server — survives app restarts',
+    ],
+    changes: [
+      { type: 'new',  text: 'Printers — Edit Settings modal: change name, IP, access code, camera IP, AMS config for any existing printer' },
+      { type: 'new',  text: 'Printers — Pencil icon on each card opens Edit Settings directly' },
+      { type: 'new',  text: 'Server — PATCH /api/printers/:id route for editing existing printers' },
+      { type: 'new',  text: 'Server — GET /api/printers now returns access_code to owner for edit pre-population' },
+      { type: 'fix',  text: 'Filament — Custom tab content was rendering outside its conditional, always visible' },
+      { type: 'fix',  text: 'Finance — Export CSV button now actually exports a CSV file' },
+      { type: 'fix',  text: 'Job Queue — Selecting a linked order now auto-fills the customer name field' },
+      { type: 'fix',  text: 'Customers — Order-derived customers no longer disappear when manual customers exist; both sources are always merged' },
+      { type: 'fix',  text: 'Quotes — Business info (name, address, email, HST number) now saved to server and restored on next open' },
+      { type: 'fix',  text: 'Logo — Sidebar now shows printer SVG when icon.png fails to load' },
+      { type: 'fix',  text: 'Server — Rate limiter removed; was blocking Windows clients with Too Many Requests errors' },
+    ],
+  },
+  {
     version: '1.0.10',
     date: '2026-04-07',
     title: 'Camera Config, Logo Fix & Stability',

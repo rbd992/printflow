@@ -274,9 +274,13 @@ export default function JobQueuePage() {
           <div className="form-row">
             <div className="form-group">
               <label className="label">Linked Order</label>
-              <select className="select" {...F('order_id')}>
+              <select className="select" value={form.order_id} onChange={e=>{
+                const orderId = e.target.value;
+                const order = orders.find(o=>String(o.id)===String(orderId));
+                setForm(f=>({ ...f, order_id: orderId, customer_name: order ? order.customer_name : f.customer_name }));
+              }}>
                 <option value="">None</option>
-                {orders.filter(o => !['delivered','cancelled'].includes(o.status)).map(o => (
+                {orders.filter(o=>!['delivered','cancelled'].includes(o.status)).map(o=>(
                   <option key={o.id} value={o.id}>{o.order_number} — {o.customer_name}</option>
                 ))}
               </select>

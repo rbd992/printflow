@@ -44,11 +44,19 @@ export default function QuotePage() {
   useEffect(() => {
     api.get('/api/customers').then(r => setCustomers(r.data || [])).catch(() => {});
     api.get('/api/orders').then(r => setOrders(r.data || [])).catch(() => {});
+    // Load persisted business info
+    api.get('/api/settings/biz_info').then(r => { if (r.data?.value) setBiz(b => ({ ...b, ...r.data.value })); }).catch(() => {});
     // Auto-generate doc number
     const prefix = docType === 'quote' ? 'Q' : 'INV';
     const num = String(Math.floor(Date.now() / 1000) % 100000).padStart(5, '0');
     setDocNum(`${prefix}-${num}`);
   }, [docType]);
+
+  async function saveBizInfo() {
+    try {
+      await api.post('/api/settings', { key: 'biz_info', value: biz });
+    } catch {}
+  }
 
   function fillFromCustomer(id) {
     const c = customers.find(c => String(c.id) === String(id));
@@ -248,6 +256,9 @@ export default function QuotePage() {
                   <input className="input" value={biz[key]} onChange={e => setBiz(b => ({ ...b, [key]: e.target.value }))} style={{ fontSize: 12 }} />
                 </div>
               ))}
+              <button className="btn btn-secondary btn-sm" style={{ width:'100%',justifyContent:'center',marginTop:4 }} onClick={saveBizInfo}>
+                Save Business Info
+              </button>
             </div>
 
             <div className="card" style={{ padding: 18 }}>

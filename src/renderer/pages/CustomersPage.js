@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { api, ordersApi } from '../api/client';
 import { useAuthStore } from '../stores/authStore';
 
@@ -58,28 +58,37 @@ export default function CustomersPage() {
 
   useEffect(() => { load(); }, [load]);
 
-  // Build customers from orders if no customer records exist yet
-  const allCustomers = customers.length > 0 ? customers : buildFromOrders(orders);
-
-  function buildFromOrders(orders) {
-    const map = {};
+  // Always merge manual customers with order-derived ones
+  // Manual customers take priority; order customers fill in the gaps
+  const allCustomers = React.useMemo(() => {
+    const manualMap = {};
+    customers.forEach(c => {
+      const key = (c.email || c.name || '').toLowerCase();
+      manualMap[key] = { ...c, orders: [], totalSpent: 0 };
+    });
+    // Layer order data on top
     orders.forEach(o => {
       const key = (o.customer_email || o.customer_name || '').toLowerCase();
       if (!key) return;
-      if (!map[key]) {
-        map[key] = {
-          id: key, name: o.customer_name, email: o.customer_email,
-          phone: o.customer_phone, orders: [], totalSpent: 0,
-          firstOrder: o.created_at, lastOrder: o.created_at,
-          fromOrders: true,
-        };
+      if (manualMap[key]) {
+        manualMap[key].orders.push(o);
+        manualMap[key].totalSpent += o.price_cad || 0;
+      } else {
+        // Order-only customer
+        if (!manualMap[`order_${key}`]) {
+          manualMap[`order_${key}`] = {
+            id: key, name: o.customer_name, email: o.customer_email,
+            phone: o.customer_phone, orders: [], totalSpent: 0,
+            firstOrder: o.created_at, lastOrder: o.created_at, fromOrders: true,
+          };
+        }
+        manualMap[`order_${key}`].orders.push(o);
+        manualMap[`order_${key}`].totalSpent += o.price_cad || 0;
+        if (o.created_at > manualMap[`order_${key}`].lastOrder) manualMap[`order_${key}`].lastOrder = o.created_at;
       }
-      map[key].orders.push(o);
-      map[key].totalSpent += o.price_cad || 0;
-      if (o.created_at > map[key].lastOrder) map[key].lastOrder = o.created_at;
     });
-    return Object.values(map).sort((a, b) => b.totalSpent - a.totalSpent);
-  }
+    return Object.values(manualMap).sort((a, b) => b.totalSpent - a.totalSpent);
+  }, [customers, orders]);
 
   function getCustomerOrders(customer) {
     if (customer.fromOrders) return customer.orders || [];
