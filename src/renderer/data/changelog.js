@@ -3,6 +3,37 @@
 
 export const CHANGELOG = [
   {
+    version: '1.0.15',
+    date: '2026-04-07',
+    title: 'Camera Fix & Bambu Cloud Verify Fix',
+    highlights: [
+      'Camera feed now works — Electron web security updated to allow local NAS streams',
+      'Bambu Cloud non-JSON verify response handled gracefully',
+      'Better error logging for Bambu Cloud API responses',
+    ],
+    changes: [
+      { type: 'fix', text: 'Camera — Electron webSecurity disabled to allow MJPEG streams from local NAS (http://10.0.0.219)' },
+      { type: 'fix', text: 'Bambu Cloud — non-JSON response from verify endpoint no longer crashes with unhandled error' },
+      { type: 'improve', text: 'Bambu Cloud — full response body now logged when non-JSON is received, for easier debugging' },
+    ],
+  },
+  {
+    version: '1.0.14',
+    date: '2026-04-07',
+    title: 'Camera CSP Fix & Bambu Cloud Apple ID Error',
+    highlights: [
+      'Camera CSP header fix attempted for MJPEG stream loading',
+      'Bambu Cloud login now shows helpful error for Apple/Google OAuth accounts',
+      'Dockerfile corrected — ffmpeg and bash now actually install on rebuild',
+    ],
+    changes: [
+      { type: 'fix', text: 'Camera — CSP session header added to allow NAS media streams (superseded by webSecurity fix in 1.0.15)' },
+      { type: 'fix', text: 'Bambu Cloud — Apple/Google OAuth accounts now get a clear message directing to set a password at bambulab.com' },
+      { type: 'fix', text: 'Dockerfile — ffmpeg and bash were in repo but missing from NAS Dockerfile; now synced and will install on next rebuild' },
+      { type: 'improve', text: 'Bambu Cloud — login error messages now properly stringified in server logs' },
+    ],
+  },
+  {
     version: '1.0.13',
     date: '2026-04-07',
     title: 'Parts Catalogue — P1S & H2C Rebuilt',
