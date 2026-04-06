@@ -127,9 +127,10 @@ REM Get current version from package.json
 for /f %%v in ('node -e "console.log(require('./package.json').version)"') do set CURRENT_VER=%%v
 echo   package.json version : v!CURRENT_VER!
 
-REM Check if this version already exists as a GitHub tag
+REM Check if this version already exists as a GitHub tag (using git ls-remote, no HTTPS timeout issue)
 echo   Checking GitHub for existing releases...
-for /f %%r in ('node -e "var https=require('https'),opt={hostname:'api.github.com',path:'/repos/rbd992/printflow/git/refs/tags/v!CURRENT_VER!',headers:{'User-Agent':'deploy-bat','Authorization':''}};var r=https.request(opt,function(res){process.stdout.write(String(res.statusCode));});r.on('error',function(){process.stdout.write('ERR');});r.end();" 2^>nul') do set GH_STATUS=%%r
+set GH_STATUS=404
+  for /f "tokens=*" %%t in ('git ls-remote --tags origin refs/tags/v!CURRENT_VER! 2^>nul') do set GH_STATUS=200
 
 REM Compute auto-suggested next patch version
 for /f %%n in ('node -e "var v='!CURRENT_VER!'.split('.');v[2]=parseInt(v[2])+1;console.log(v.join('.'))"') do set NEXT_VER=%%n

@@ -156,56 +156,63 @@ function CameraFeed({ printer, token }) {
       }
 
       setLoading(false);
-      const reader  = res.body.getReader();
-      let   buf     = new Uint8Array(0);
-      const SOI     = new Uint8Array([0xFF, 0xD8]);
-      const EOI     = new Uint8Array([0xFF, 0xD9]);
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder('utf-8', { fatal: false });
+      let buf = new Uint8Array(0);
 
-      const indexOf = (haystack, needle, from = 0) => {
-        outer: for (let i = from; i <= haystack.length - needle.length; i++) {
-          for (let j = 0; j < needle.length; j++) {
-            if (haystack[i + j] !== needle[j]) continue outer;
-          }
+      const append = (a, b) => { const n = new Uint8Array(a.length + b.length); n.set(a); n.set(b, a.length); return n; };
+      const indexOfSeq = (hay, needle, from = 0) => {
+        outer: for (let i = from; i <= hay.length - needle.length; i++) {
+          for (let j = 0; j < needle.length; j++) if (hay[i+j] !== needle[j]) continue outer;
           return i;
         }
         return -1;
+      };
+      const CRLF2 = new Uint8Array([0x0d,0x0a,0x0d,0x0a]); // \r\n\r\n
+
+      const drawFrame = (frameBytes) => {
+        const blob = new Blob([frameBytes], { type: 'image/jpeg' });
+        const url  = URL.createObjectURL(blob);
+        const img  = new Image();
+        img.onload = () => {
+          const canvas = canvasRef.current;
+          if (canvas) {
+            canvas.width  = img.naturalWidth;
+            canvas.height = img.naturalHeight;
+            canvas.getContext('2d').drawImage(img, 0, 0);
+          }
+          URL.revokeObjectURL(url);
+        };
+        img.onerror = () => URL.revokeObjectURL(url);
+        img.src = url;
       };
 
       while (true) {
         const { value, done } = await reader.read();
         if (done) break;
+        buf = append(buf, value);
 
-        // Append new chunk
-        const next = new Uint8Array(buf.length + value.length);
-        next.set(buf); next.set(value, buf.length);
-        buf = next;
-
-        // Extract all complete JPEG frames
-        let start = 0;
+        // Parse multipart frames using Content-Length header
         while (true) {
-          const soi = indexOf(buf, SOI, start);
-          if (soi === -1) break;
-          const eoi = indexOf(buf, EOI, soi + 2);
-          if (eoi === -1) break;
-          const frame = buf.slice(soi, eoi + 2);
-          start = eoi + 2;
+          // Find end of headers (\r\n\r\n)
+          const headerEnd = indexOfSeq(buf, CRLF2);
+          if (headerEnd === -1) break;
 
-          // Draw frame to canvas
-          const blob = new Blob([frame], { type: 'image/jpeg' });
-          const url  = URL.createObjectURL(blob);
-          const img  = new Image();
-          img.onload = () => {
-            const canvas = canvasRef.current;
-            if (canvas) {
-              canvas.width  = img.width;
-              canvas.height = img.height;
-              canvas.getContext('2d').drawImage(img, 0, 0);
-            }
-            URL.revokeObjectURL(url);
-          };
-          img.src = url;
+          // Extract header block as text
+          const headerText = decoder.decode(buf.slice(0, headerEnd));
+          const clMatch = headerText.match(/Content-Length:\s*(\d+)/i);
+          if (!clMatch) { buf = buf.slice(headerEnd + 4); continue; }
+
+          const frameLen = parseInt(clMatch[1], 10);
+          const frameStart = headerEnd + 4;
+          const frameEnd = frameStart + frameLen;
+
+          // Wait until we have the full frame
+          if (buf.length < frameEnd) break;
+
+          drawFrame(buf.slice(frameStart, frameEnd));
+          buf = buf.slice(frameEnd);
         }
-        buf = buf.slice(start);
       }
     } catch (err) {
       if (err.name === 'AbortError') return; // normal stop
