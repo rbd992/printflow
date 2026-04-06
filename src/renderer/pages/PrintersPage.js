@@ -262,25 +262,15 @@ function CameraFeed({ printer, token }) {
           <div style={{ position:'absolute',top:6,right:6,display:'flex',gap:4 }}>
             <button onClick={e => {
               e.stopPropagation();
-              // Open popout window with the stream
-              const w = window.open('', '_blank', 'width=854,height=480,menubar=no,toolbar=no,location=no,status=no');
-              if (w) {
-                const src = `${streamUrl}?token=${encodeURIComponent(token)}`;
-                w.document.write(`<!DOCTYPE html><html><head><title>${printer.name} — Camera</title><style>*{margin:0;padding:0;background:#000;overflow:hidden}canvas{width:100vw;height:100vh;object-fit:contain}</style></head><body><canvas id='c'></canvas><script>
-var src='${src}';
-var canvas=document.getElementById('c');
-var decoder=new TextDecoder();
-var buf=new Uint8Array(0);
-function append(a,b){var n=new Uint8Array(a.length+b.length);n.set(a);n.set(b,a.length);return n;}
-function find(h,n,f){f=f||0;outer:for(var i=f;i<=h.length-n.length;i++){for(var j=0;j<n.length;j++)if(h[i+j]!==n[j])continue outer;return i;}return -1;}
-var CRLF2=new Uint8Array([13,10,13,10]);
-fetch(src).then(function(r){var reader=r.body.getReader();function read(){reader.read().then(function(d){if(d.done)return;buf=append(buf,d.value);while(true){var he=find(buf,CRLF2);if(he===-1)break;var ht=decoder.decode(buf.slice(0,he));var m=ht.match(/Content-Length:\s*(\d+)/i);if(!m){buf=buf.slice(he+4);continue;}var fl=parseInt(m[1]);var fs=he+4;var fe=fs+fl;if(buf.length<fe)break;var fb=buf.slice(fs,fe);buf=buf.slice(fe);createImageBitmap(new Blob([fb],{type:'image/jpeg'})).then(function(bm){canvas.width=bm.width;canvas.height=bm.height;canvas.getContext('2d').drawImage(bm,0,0);bm.close();});}read();});}read();});
-<\/script></body></html>`);
-                w.document.close();
-              }
+              // Open fullscreen camera view in a new Electron window via IPC
+              window.printflow.openCameraPopout({
+                serial: printer.serial,
+                name: printer.name,
+                streamUrl: `${streamUrl}?token=${encodeURIComponent(token)}`,
+              });
             }}
               style={{ background:'rgba(0,0,0,0.6)',border:'none',color:'#fff',borderRadius:4,padding:'3px 7px',fontSize:10,cursor:'pointer' }}
-              title="Open in popup">
+              title="Open fullscreen">
               ⛶
             </button>
             <button onClick={e => { e.stopPropagation(); stopStream(); }}

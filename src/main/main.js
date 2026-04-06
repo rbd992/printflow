@@ -203,7 +203,83 @@ ipcMain.handle('token:set', (_, token) => {
 });
 ipcMain.handle('token:clear', () => { store.delete('authToken'); });
 
-ipcMain.on('window:minimize', () => mainWindow?.minimize());
+ipcMain.on('camera:popout', (_, { serial, name, streamUrl }) => {
+  const popup = new BrowserWindow({
+    width: 1280, height: 720, minWidth: 640, minHeight: 360,
+    title: `${name} — Camera`,
+    backgroundColor: '#000000',
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true,
+      webSecurity: false,
+    },
+  });
+
+  // Self-contained MJPEG viewer page
+  const html = `<!DOCTYPE html>
+<html><head>
+<meta charset="utf-8">
+<title>${name} — Camera</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; background:#000; }
+body { display:flex; flex-direction:column; height:100vh; overflow:hidden; font-family:sans-serif; }
+#bar { height:32px; background:#111; display:flex; align-items:center; padding:0 12px; gap:8px; flex-shrink:0; -webkit-app-region:drag; }
+#bar span { color:#fff; font-size:12px; font-weight:600; opacity:0.8; }
+#badge { background:#e53935; color:#fff; font-size:9px; font-weight:700; padding:2px 6px; border-radius:3px; letter-spacing:0.05em; }
+#frames { color:#aaa; font-size:10px; }
+#wrap { flex:1; display:flex; align-items:center; justify-content:center; overflow:hidden; }
+canvas { max-width:100%; max-height:100%; object-fit:contain; display:block; }
+</style>
+</head><body>
+<div id="bar">
+  <span id="badge">LIVE</span>
+  <span>${name}</span>
+  <span id="frames">Connecting...</span>
+</div>
+<div id="wrap"><canvas id="c"></canvas></div>
+<script>
+var canvas=document.getElementById('c');
+var framesEl=document.getElementById('frames');
+var decoder=new TextDecoder();
+var buf=new Uint8Array(0);
+var frames=0;
+function append(a,b){var n=new Uint8Array(a.length+b.length);n.set(a);n.set(b,a.length);return n;}
+function find(h,n,f){f=f||0;outer:for(var i=f;i<=h.length-n.length;i++){for(var j=0;j<n.length;j++)if(h[i+j]!==n[j])continue outer;return i;}return -1;}
+var CRLF2=new Uint8Array([13,10,13,10]);
+fetch('${streamUrl}').then(function(r){
+  if(!r.ok){framesEl.textContent='Error: HTTP '+r.status;return;}
+  framesEl.textContent='0 frames';
+  var reader=r.body.getReader();
+  function read(){reader.read().then(function(d){
+    if(d.done){framesEl.textContent='Stream ended';return;}
+    buf=append(buf,d.value);
+    while(true){
+      var he=find(buf,CRLF2);
+      if(he===-1)break;
+      var ht=decoder.decode(buf.slice(0,he));
+      var m=ht.match(/Content-Length:\s*(\d+)/i);
+      if(!m){buf=buf.slice(he+4);continue;}
+      var fl=parseInt(m[1]),fs=he+4,fe=fs+fl;
+      if(buf.length<fe)break;
+      var fb=buf.slice(fs,fe);buf=buf.slice(fe);
+      createImageBitmap(new Blob([fb],{type:'image/jpeg'})).then(function(bm){
+        canvas.width=bm.width;canvas.height=bm.height;
+        canvas.getContext('2d').drawImage(bm,0,0);bm.close();
+        framesEl.textContent=(++frames)+' frames';
+      });
+    }
+    read();
+  }).catch(function(){framesEl.textContent='Connection lost';});}
+  read();
+}).catch(function(e){framesEl.textContent='Failed: '+e.message;});
+<\/script>
+</body></html>`;
+
+  popup.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html));
+  popup.setMenu(null);
+});
+
+
 ipcMain.on('window:maximize', () => {
   if (mainWindow?.isMaximized()) mainWindow.unmaximize();
   else mainWindow?.maximize();

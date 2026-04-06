@@ -27,6 +27,9 @@ contextBridge.exposeInMainWorld('printflow', {
   // Auto-detect best server (LAN vs Tailscale)
   autoDetectServer: () => ipcRenderer.invoke('server:autoDetect'),
 
+  // Camera popout window
+  openCameraPopout: (opts) => ipcRenderer.send('camera:popout', opts),
+
   // Updates
   checkForUpdates: ()          => ipcRenderer.invoke('updates:check'),
   downloadUpdate:  (url)       => ipcRenderer.invoke('updates:download', url),
