@@ -204,9 +204,6 @@ ipcMain.handle('token:set', (_, token) => {
 ipcMain.handle('token:clear', () => { store.delete('authToken'); });
 
 ipcMain.on('camera:popout', (_, { serial, name, streamUrl }) => {
-  const os = require('os');
-  const fs = require('fs');
-
   const popup = new BrowserWindow({
     width: 1280, height: 720, minWidth: 640, minHeight: 360,
     title: `${name} \u2014 Camera`,
@@ -218,77 +215,12 @@ ipcMain.on('camera:popout', (_, { serial, name, streamUrl }) => {
     },
   });
 
-  // Allow file:// page to fetch from local NAS (mixed content)
-  popup.webContents.session.webRequest.onHeadersReceived((details, callback) => {
-    callback({
-      responseHeaders: {
-        ...details.responseHeaders,
-        'Access-Control-Allow-Origin': ['*'],
-        'Content-Security-Policy': [
-          "default-src 'self' 'unsafe-inline' 'unsafe-eval' blob: http://10.0.0.219:3001 http://100.68.105.76:3001",
-        ],
-      },
-    });
-  });
-
-  const tmp = path.join(os.tmpdir(), `printflow-cam-${serial}.html`);
-
-  const html = `<!DOCTYPE html>
-<html><head>
-<meta charset="utf-8">
-<title>${name} \u2014 Camera</title>
-<style>
-* { margin:0; padding:0; box-sizing:border-box; background:#000; }
-body { display:flex; flex-direction:column; height:100vh; overflow:hidden; font-family:-apple-system,sans-serif; }
-#bar { height:36px; background:#111; display:flex; align-items:center; padding:0 14px; gap:10px; flex-shrink:0; -webkit-app-region:drag; user-select:none; }
-#badge { background:#e53935; color:#fff; font-size:9px; font-weight:700; padding:2px 7px; border-radius:3px; letter-spacing:0.06em; }
-#title { color:#fff; font-size:13px; font-weight:600; }
-#info { color:#666; font-size:11px; margin-left:auto; }
-#wrap { flex:1; display:flex; align-items:center; justify-content:center; background:#000; }
-canvas { max-width:100%; max-height:100%; object-fit:contain; }
-</style>
-</head><body>
-<div id="bar">
-  <span id="badge">LIVE</span>
-  <span id="title">${name}</span>
-  <span id="info">Connecting...</span>
-</div>
-<div id="wrap"><canvas id="c"></canvas></div>
-<script>
-var canvas=document.getElementById('c');
-var info=document.getElementById('info');
-var dec=new TextDecoder(),buf=new Uint8Array(0),frames=0;
-function cat(a,b){var n=new Uint8Array(a.length+b.length);n.set(a);n.set(b,a.length);return n;}
-function idx(h,n,f){f=f||0;o:for(var i=f;i<=h.length-n.length;i++){for(var j=0;j<n.length;j++)if(h[i+j]!==n[j])continue o;return i;}return -1;}
-var D=new Uint8Array([13,10,13,10]);
-fetch('${streamUrl}').then(function(r){
-  if(!r.ok){info.textContent='HTTP '+r.status;return;}
-  info.textContent='0 frames';
-  var rd=r.body.getReader();
-  (function read(){rd.read().then(function(d){
-    if(d.done){info.textContent='Stream ended';return;}
-    buf=cat(buf,d.value);
-    for(;;){
-      var he=idx(buf,D);if(he===-1)break;
-      var ht=dec.decode(buf.slice(0,he));
-      var m=ht.match(/Content-Length:\s*(\d+)/i);if(!m){buf=buf.slice(he+4);continue;}
-      var fl=parseInt(m[1]),fs2=he+4,fe=fs2+fl;if(buf.length<fe)break;
-      var fb=buf.slice(fs2,fe);buf=buf.slice(fe);
-      createImageBitmap(new Blob([fb],{type:'image/jpeg'})).then(function(bm){
-        canvas.width=bm.width;canvas.height=bm.height;
-        canvas.getContext('2d').drawImage(bm,0,0);bm.close();
-        info.textContent=(++frames)+' frames';
-      });
-    }
-    read();
-  }).catch(function(e){info.textContent='Lost: '+e.message;});})();
-}).catch(function(e){info.textContent='Error: '+e.message;});
-<\/script></body></html>`;
-
-  fs.writeFileSync(tmp, html, 'utf8');
-  popup.loadFile(tmp);
+  // Load the popout HTML directly from the NAS server
+  // This avoids file:// mixed-content blocking when fetching the stream
+  const serverBase = store.get('serverUrl') || 'http://10.0.0.219:3001';
+  const popoutUrl  = `${serverBase}/camera-popout?serial=${encodeURIComponent(serial)}&name=${encodeURIComponent(name)}&streamUrl=${encodeURIComponent(streamUrl)}`;
+  popup.loadURL(popoutUrl);
   popup.setMenu(null);
-  popup.on('closed', () => { try { fs.unlinkSync(tmp); } catch {} });
 });
 
 

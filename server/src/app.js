@@ -82,6 +82,58 @@ app.use('/api/customers',     customersRoutes);
 app.use('/api/notifications', notificationsRoutes);
 app.use('/api/camera',        cameraRoutes);
 
+// ── Camera popout viewer page ──────────────────────────────────
+app.get('/camera-popout', (req, res) => {
+  const { name = 'Camera', streamUrl = '' } = req.query;
+  const safeName = name.replace(/[<>"]/g, '');
+  const html = `<!DOCTYPE html>
+<html><head>
+<meta charset="utf-8"><title>${safeName} \u2014 Camera</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;background:#000}
+body{display:flex;flex-direction:column;height:100vh;overflow:hidden;font-family:-apple-system,sans-serif}
+#bar{height:36px;background:#111;display:flex;align-items:center;padding:0 14px;gap:10px;flex-shrink:0;-webkit-app-region:drag;user-select:none}
+#badge{background:#e53935;color:#fff;font-size:9px;font-weight:700;padding:2px 7px;border-radius:3px;letter-spacing:.06em}
+#title{color:#fff;font-size:13px;font-weight:600}
+#info{color:#666;font-size:11px;margin-left:auto}
+#wrap{flex:1;display:flex;align-items:center;justify-content:center}
+canvas{max-width:100%;max-height:100%;object-fit:contain}
+</style>
+</head><body>
+<div id="bar"><span id="badge">LIVE</span><span id="title">${safeName}</span><span id="info">Connecting...</span></div>
+<div id="wrap"><canvas id="c"></canvas></div>
+<script>
+var canvas=document.getElementById('c'),info=document.getElementById('info');
+var dec=new TextDecoder(),buf=new Uint8Array(0),frames=0;
+var src=decodeURIComponent('${encodeURIComponent(streamUrl)}');
+function cat(a,b){var n=new Uint8Array(a.length+b.length);n.set(a);n.set(b,a.length);return n;}
+function idx(h,n,f){f=f||0;o:for(var i=f;i<=h.length-n.length;i++){for(var j=0;j<n.length;j++)if(h[i+j]!==n[j])continue o;return i;}return -1;}
+var D=new Uint8Array([13,10,13,10]);
+fetch(src).then(function(r){
+  if(!r.ok){info.textContent='HTTP '+r.status;return;}
+  info.textContent='0 frames';
+  var rd=r.body.getReader();
+  (function read(){rd.read().then(function(d){
+    if(d.done){info.textContent='Stream ended';return;}
+    buf=cat(buf,d.value);
+    for(;;){var he=idx(buf,D);if(he===-1)break;
+      var ht=dec.decode(buf.slice(0,he));
+      var m=ht.match(/Content-Length:\\s*(\\d+)/i);if(!m){buf=buf.slice(he+4);continue;}
+      var fl=parseInt(m[1]),fs=he+4,fe=fs+fl;if(buf.length<fe)break;
+      var fb=buf.slice(fs,fe);buf=buf.slice(fe);
+      createImageBitmap(new Blob([fb],{type:'image/jpeg'})).then(function(bm){
+        canvas.width=bm.width;canvas.height=bm.height;
+        canvas.getContext('2d').drawImage(bm,0,0);bm.close();
+        info.textContent=(++frames)+' frames';
+      });}
+    read();
+  }).catch(function(e){info.textContent='Lost: '+e.message;});})();
+}).catch(function(e){info.textContent='Error: '+e.message;});
+<\/script></body></html>`;
+  res.setHeader('Content-Type', 'text/html');
+  res.send(html);
+});
+
 // ── Health check ────────────────────────────────────────────────
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', ts: new Date().toISOString(), version: '1.0.0' });
