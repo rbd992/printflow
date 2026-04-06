@@ -183,13 +183,18 @@ function CameraFeed({ printer, token }) {
         img.onload = () => {
           const canvas = canvasRef.current;
           if (canvas) {
-            canvas.width  = img.naturalWidth;
-            canvas.height = img.naturalHeight;
-            canvas.getContext('2d').drawImage(img, 0, 0);
+            // Use intrinsic size — fall back to fixed dimensions if 0
+            const w = img.naturalWidth  || img.width  || 640;
+            const h = img.naturalHeight || img.height || 480;
+            if (canvas.width !== w)  canvas.width  = w;
+            if (canvas.height !== h) canvas.height = h;
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, w, h);
+            ctx.drawImage(img, 0, 0, w, h);
           }
           URL.revokeObjectURL(url);
         };
-        img.onerror = () => URL.revokeObjectURL(url);
+        img.onerror = (e) => { console.error('Frame draw error:', e); URL.revokeObjectURL(url); };
         img.src = url;
       };
 
