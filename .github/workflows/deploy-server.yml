@@ -1,10 +1,7 @@
-name: Deploy Server
-
+name: Deploy Server (Legacy — use build-docker.yml)
+# This workflow is superseded by build-docker.yml which also handles Synology.
+# Keeping it here for manual fallback only.
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'server/**'
   workflow_dispatch:
 
 jobs:

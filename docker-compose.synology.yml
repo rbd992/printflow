@@ -1,0 +1,19 @@
+# PrintFlow Server — Synology NAS Override
+# ─────────────────────────────────────────────────────────────────────────────
+# Use this on Synology NAS instead of the default docker-compose.yml.
+# Synology DSM manages port mapping via the Container Manager UI,
+# so we use bridge networking here instead of host mode.
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.synology.yml up -d
+# ─────────────────────────────────────────────────────────────────────────────
+
+services:
+  printflow:
+    # Override network mode for Synology (bridge instead of host)
+    network_mode: bridge
+
+    volumes:
+      # On Synology, map to a shared folder for easy access via File Station
+      - /volume1/printflow1/data:/app/data
+      - /volume1/printflow1/logs:/app/logs
