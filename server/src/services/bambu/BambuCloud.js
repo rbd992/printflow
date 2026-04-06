@@ -121,6 +121,8 @@ async function submitLoginCode(tfaKey, code, email) {
     return { token: res.accessToken, uid: res.uid };
   }
 
+  // Log full response so we can see what Bambu actually returned
+  logger.error('[BambuCloud] Verify failed, full response: ' + JSON.stringify(res));
   throw new Error(res.message || 'Invalid 2FA code');
 }
 

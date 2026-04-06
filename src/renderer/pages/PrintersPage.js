@@ -120,6 +120,7 @@ function CameraFeed({ printer, token }) {
   const [streaming, setStreaming] = useState(false);
   const [error, setError]         = useState(null);
   const [loading, setLoading]     = useState(false);
+  const [frameCount, setFrameCount] = useState(0);
   const canvasRef  = useRef(null);
   const abortRef   = useRef(null);
   const serverUrl  = getServerUrl();
@@ -130,12 +131,14 @@ function CameraFeed({ printer, token }) {
     api.delete(`/api/camera/${printer.serial}/stream`).catch(() => {});
     setStreaming(false);
     setLoading(false);
+    setFrameCount(0);
   }, [printer.serial]);
 
   const startStream = useCallback(async () => {
     setError(null);
     setLoading(true);
     setStreaming(true);
+    setFrameCount(0);
 
     const controller = new AbortController();
     abortRef.current = controller;
@@ -152,13 +155,14 @@ function CameraFeed({ printer, token }) {
 
       const contentType = res.headers.get('content-type') || '';
       if (!contentType.includes('multipart')) {
-        throw new Error('Unexpected response from camera server');
+        throw new Error('Server returned unexpected content type: ' + contentType);
       }
 
       setLoading(false);
       const reader = res.body.getReader();
       const decoder = new TextDecoder('utf-8', { fatal: false });
       let buf = new Uint8Array(0);
+      let frames = 0;
 
       const append = (a, b) => { const n = new Uint8Array(a.length + b.length); n.set(a); n.set(b, a.length); return n; };
       const indexOfSeq = (hay, needle, from = 0) => {
@@ -168,9 +172,11 @@ function CameraFeed({ printer, token }) {
         }
         return -1;
       };
-      const CRLF2 = new Uint8Array([0x0d,0x0a,0x0d,0x0a]); // \r\n\r\n
+      const CRLF2 = new Uint8Array([0x0d,0x0a,0x0d,0x0a]);
 
       const drawFrame = (frameBytes) => {
+        frames++;
+        setFrameCount(frames);
         const blob = new Blob([frameBytes], { type: 'image/jpeg' });
         const url  = URL.createObjectURL(blob);
         const img  = new Image();
@@ -192,13 +198,10 @@ function CameraFeed({ printer, token }) {
         if (done) break;
         buf = append(buf, value);
 
-        // Parse multipart frames using Content-Length header
         while (true) {
-          // Find end of headers (\r\n\r\n)
           const headerEnd = indexOfSeq(buf, CRLF2);
           if (headerEnd === -1) break;
 
-          // Extract header block as text
           const headerText = decoder.decode(buf.slice(0, headerEnd));
           const clMatch = headerText.match(/Content-Length:\s*(\d+)/i);
           if (!clMatch) { buf = buf.slice(headerEnd + 4); continue; }
@@ -207,7 +210,6 @@ function CameraFeed({ printer, token }) {
           const frameStart = headerEnd + 4;
           const frameEnd = frameStart + frameLen;
 
-          // Wait until we have the full frame
           if (buf.length < frameEnd) break;
 
           drawFrame(buf.slice(frameStart, frameEnd));
@@ -215,10 +217,10 @@ function CameraFeed({ printer, token }) {
         }
       }
     } catch (err) {
-      if (err.name === 'AbortError') return; // normal stop
+      if (err.name === 'AbortError') return;
       setError(err.message || 'Camera connection failed');
-    } finally {
       setStreaming(false);
+    } finally {
       setLoading(false);
     }
   }, [streamUrl, token]);
@@ -250,7 +252,10 @@ function CameraFeed({ printer, token }) {
             <button onClick={e => { e.stopPropagation(); stopStream(); }}
               style={{ background:'rgba(0,0,0,0.6)',border:'none',color:'#fff',borderRadius:4,padding:'3px 7px',fontSize:10,cursor:'pointer' }}>✖ Stop</button>
           </div>
-          <div style={{ position:'absolute',top:6,left:6,background:'var(--red)',color:'#fff',fontSize:9,fontWeight:700,padding:'2px 6px',borderRadius:4,letterSpacing:'0.05em' }}>LIVE</div>
+          <div style={{ position:'absolute',top:6,left:6,display:'flex',gap:4,alignItems:'center' }}>
+            <div style={{ background:'var(--red)',color:'#fff',fontSize:9,fontWeight:700,padding:'2px 6px',borderRadius:4,letterSpacing:'0.05em' }}>LIVE</div>
+            {frameCount > 0 && <div style={{ background:'rgba(0,0,0,0.6)',color:'#fff',fontSize:9,padding:'2px 6px',borderRadius:4 }}>{frameCount} frames</div>}
+          </div>
         </div>
       )}
       {error && (
