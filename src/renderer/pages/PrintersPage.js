@@ -1,5 +1,5 @@
-import React, { useEffect, useState, useCallback } from 'react';
-import { api } from '../api/client';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
+import { api, getServerUrl } from '../api/client';
 import { onSocketEvent } from '../api/socket';
 import { useAuthStore } from '../stores/authStore';
 
@@ -21,6 +21,120 @@ function Modal({ title, onClose, children, width=480 }) {
 function StatusDot({ status }) {
   const c = status==='printing'?'var(--green)':status==='paused'?'var(--amber)':status==='error'?'var(--red)':status==='idle'?'var(--accent)':'var(--text-tertiary)';
   return <div style={{ width:10,height:10,borderRadius:'50%',background:c,boxShadow:`0 0 6px ${c}`,flexShrink:0 }}/>;
+}
+
+// ── Camera Feed Component ───────────────────────────────────────────
+function CameraFeed({ printer, token }) {
+  const [streaming, setStreaming] = useState(false);
+  const [error, setError]         = useState(null);
+  const [loading, setLoading]     = useState(false);
+  const imgRef = useRef(null);
+
+  const serverUrl = getServerUrl();
+  const streamUrl = `${serverUrl}/api/camera/${printer.serial}/stream`;
+
+  function startStream() {
+    setLoading(true);
+    setError(null);
+    setStreaming(true);
+  }
+
+  function stopStream() {
+    setStreaming(false);
+    setError(null);
+    // Tell server to kill the ffmpeg process
+    api.delete(`/api/camera/${printer.serial}/stream`).catch(()=>{});
+  }
+
+  function handleImgLoad() {
+    setLoading(false);
+  }
+
+  function handleImgError() {
+    setLoading(false);
+    setError('Could not connect to camera. Make sure:\n• LAN Mode Liveview is enabled on the printer\n• The printer IP and access code are correct\n• ffmpeg is installed on the server');
+    setStreaming(false);
+  }
+
+  // Clean up stream when component unmounts
+  useEffect(() => {
+    return () => {
+      if (streaming) {
+        api.delete(`/api/camera/${printer.serial}/stream`).catch(()=>{});
+      }
+    };
+  }, [streaming, printer.serial]);
+
+  return (
+    <div style={{ marginTop: 12 }}>
+      {!streaming ? (
+        <button
+          className="btn btn-ghost btn-sm"
+          onClick={e => { e.stopPropagation(); startStream(); }}
+          style={{ fontSize: 11, color: 'var(--accent)', gap: 5, width: '100%', justifyContent: 'center', border: '0.5px solid var(--accent)', borderRadius: 'var(--r-sm)', padding: '6px 0' }}
+        >
+          📹 View Camera
+        </button>
+      ) : (
+        <div style={{ position: 'relative', borderRadius: 'var(--r-sm)', overflow: 'hidden', background: '#000' }}>
+          {/* Loading overlay */}
+          {loading && (
+            <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.8)', zIndex: 1, gap: 8 }}>
+              <div style={{ width: 24, height: 24, border: '2px solid rgba(255,255,255,0.2)', borderTopColor: 'var(--accent)', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+              <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>Connecting to camera...</div>
+            </div>
+          )}
+
+          {/* MJPEG stream — displayed as a regular img tag */}
+          <img
+            ref={imgRef}
+            src={`${streamUrl}?token=${encodeURIComponent(token)}&t=${Date.now()}`}
+            alt={`${printer.name} camera`}
+            onLoad={handleImgLoad}
+            onError={handleImgError}
+            onClick={e => e.stopPropagation()}
+            style={{ width: '100%', display: 'block', maxHeight: 240, objectFit: 'cover' }}
+          />
+
+          {/* Controls overlay */}
+          <div style={{ position: 'absolute', top: 6, right: 6, display: 'flex', gap: 4 }}>
+            <button
+              onClick={e => { e.stopPropagation(); window.printflow.openExternal(`${streamUrl}?token=${encodeURIComponent(token)}`); }}
+              style={{ background: 'rgba(0,0,0,0.6)', border: 'none', color: '#fff', borderRadius: 4, padding: '3px 7px', fontSize: 10, cursor: 'pointer' }}
+              title="Open fullscreen"
+            >
+              ⛶
+            </button>
+            <button
+              onClick={e => { e.stopPropagation(); stopStream(); }}
+              style={{ background: 'rgba(0,0,0,0.6)', border: 'none', color: '#fff', borderRadius: 4, padding: '3px 7px', fontSize: 10, cursor: 'pointer' }}
+            >
+              ✖ Stop
+            </button>
+          </div>
+
+          {/* LIVE badge */}
+          <div style={{ position: 'absolute', top: 6, left: 6, background: 'var(--red)', color: '#fff', fontSize: 9, fontWeight: 700, padding: '2px 6px', borderRadius: 4, letterSpacing: '0.05em' }}>
+            LIVE
+          </div>
+        </div>
+      )}
+
+      {/* Error message */}
+      {error && (
+        <div style={{ marginTop: 6, padding: '8px 10px', background: 'var(--red-light)', borderRadius: 'var(--r-sm)', fontSize: 11, color: 'var(--red)', lineHeight: 1.6, whiteSpace: 'pre-line' }}>
+          {error}
+        </div>
+      )}
+
+      {/* Setup hint */}
+      {!streaming && !error && (
+        <div style={{ marginTop: 4, fontSize: 10, color: 'var(--text-tertiary)', textAlign: 'center', lineHeight: 1.5 }}>
+          Enable “LAN Mode Liveview” in printer settings first
+        </div>
+      )}
+    </div>
+  );
 }
 
 // ── Cloud Login Modal ──────────────────────────────────────────────
@@ -114,6 +228,7 @@ export default function PrintersPage() {
   const [selected,setSelected] = useState(null);
   const { user } = useAuthStore();
   const isOwner = user?.role === 'owner';
+  const token = useAuthStore(s => s.token);
 
   const load = useCallback(async()=>{
     try {
@@ -252,6 +367,9 @@ export default function PrintersPage() {
                       </div>
                     </div>
                   )}
+
+                  {/* Camera feed */}
+                  <CameraFeed printer={p} token={token} />
 
                   {/* Remove button - small, bottom right */}
                   {isOwner && (

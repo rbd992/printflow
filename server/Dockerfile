@@ -3,8 +3,8 @@ FROM node:20-alpine
 LABEL maintainer="PrintFlow"
 LABEL description="PrintFlow NAS Server"
 
-# Install build deps for better-sqlite3 native module
-RUN apk add --no-cache python3 make g++ sqlite
+# Install build deps for better-sqlite3 native module + ffmpeg for camera streaming
+RUN apk add --no-cache python3 make g++ sqlite ffmpeg
 
 WORKDIR /app
 
