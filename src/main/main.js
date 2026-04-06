@@ -46,7 +46,7 @@ function createWindow() {
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true, nodeIntegration: false,
-      sandbox: false, webSecurity: true, webviewTag: true,
+      sandbox: false, webSecurity: false, webviewTag: true,
     },
   });
   const theme = store.get('theme');

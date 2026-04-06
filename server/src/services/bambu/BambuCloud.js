@@ -50,7 +50,13 @@ function bambuRequest({ method, path, body, token }) {
             reject(new Error(json.message || json.error || `HTTP ${res.statusCode}`));
           }
         } catch {
-          reject(new Error(`Non-JSON response: ${data.slice(0, 200)}`));
+          // Non-JSON response
+          logger.error('[BambuCloud] Non-JSON response from ' + path + ': ' + data.slice(0, 200));
+          if (res.statusCode >= 200 && res.statusCode < 300) {
+            resolve({ success: true, _raw: data });
+          } else {
+            reject(new Error(`Server returned non-JSON (HTTP ${res.statusCode}): ${data.slice(0, 100)}`));
+          }
         }
       });
     });
