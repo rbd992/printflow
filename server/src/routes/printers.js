@@ -25,14 +25,14 @@ router.get('/', authenticate, (req, res) => {
 // POST /api/printers  — owner only
 router.post('/', authenticate, authorize('owner'), (req, res) => {
   const db = getDb();
-  const { name, model, serial, ip_address, access_code, has_ams, ams_count, notes } = req.body;
+  const { name, model, serial, ip_address, access_code, has_ams, ams_count, notes, camera_ip, camera_access_code } = req.body;
   if (!name || !serial || !ip_address || !access_code) {
     return res.status(400).json({ error: 'name, serial, ip_address, access_code required' });
   }
   const result = db.prepare(`
-    INSERT INTO printers (name, model, serial, ip_address, access_code, has_ams, ams_count, notes)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(name, model ?? 'Unknown', serial, ip_address, access_code, has_ams ? 1 : 0, ams_count ?? 0, notes ?? null);
+    INSERT INTO printers (name, model, serial, ip_address, access_code, has_ams, ams_count, notes, camera_ip, camera_access_code)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(name, model ?? 'Unknown', serial, ip_address, access_code, has_ams ? 1 : 0, ams_count ?? 0, notes ?? null, camera_ip ?? null, camera_access_code ?? null);
   const printer = db.prepare('SELECT id, name, model, serial, ip_address, has_ams, ams_count, is_active, notes FROM printers WHERE id = ?').get(result.lastInsertRowid);
   audit({ userId: req.user.id, userName: req.user.name, action: 'create', tableName: 'printers', recordId: printer.id, newValue: printer });
   broadcast('printer:registered', printer);

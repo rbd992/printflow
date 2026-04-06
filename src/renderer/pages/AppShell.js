@@ -241,12 +241,27 @@ export default function AppShell({ theme, onThemeChange }) {
 
         {/* Brand */}
         <div style={{ padding: '0 16px 12px', borderBottom: '0.5px solid var(--border)', display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div style={{ width: 30, height: 30, borderRadius: 8, background: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, boxShadow: '0 2px 8px var(--accent-glow)' }}>
-            <img src="/icon.png" alt="" style={{ width: 26, height: 26, borderRadius: 6 }} onError={e => e.target.style.display = 'none'} />
+          <div style={{ width: 30, height: 30, borderRadius: 8, background: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, boxShadow: '0 2px 8px var(--accent-glow)', overflow: 'hidden' }}>
+            <img src="./icon.png" alt="" style={{ width: 30, height: 30, borderRadius: 8 }}
+              onError={e => {
+                e.target.style.display = 'none';
+                e.target.nextSibling.style.display = 'flex';
+              }}
+            />
+            <svg style={{ display: 'none', width: 20, height: 20 }} viewBox="0 0 80 80" fill="none">
+              <rect x="8"  y="12" width="6"  height="40" rx="3" fill="white" opacity="0.6"/>
+              <rect x="66" y="12" width="6"  height="40" rx="3" fill="white" opacity="0.6"/>
+              <rect x="8"  y="10" width="64" height="8"  rx="4" fill="white" opacity="0.8"/>
+              <rect x="31" y="12" width="18" height="11" rx="3" fill="white"/>
+              <path d="M37 23 L40 30 L43 23 Z" fill="white"/>
+              <rect x="27" y="48" width="26" height="5"  rx="2" fill="white" opacity="0.7"/>
+              <rect x="29" y="43" width="22" height="6"  rx="2" fill="white" opacity="0.55"/>
+              <rect x="10" y="57" width="60" height="8"  rx="3" fill="white" opacity="0.7"/>
+            </svg>
           </div>
           <div>
             <div style={{ fontSize: 13, fontWeight: 700, letterSpacing: '-0.01em', lineHeight: 1.2 }}>PrintFlow</div>
-            <div style={{ fontSize: 10, color: 'var(--text-tertiary)', textTransform: 'capitalize', lineHeight: 1.4 }}>v1.0.8 · {role}</div>
+            <div style={{ fontSize: 10, color: 'var(--text-tertiary)', textTransform: 'capitalize', lineHeight: 1.4 }}>v1.0.9.1 · {role}</div>
           </div>
         </div>
 

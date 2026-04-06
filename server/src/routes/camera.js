@@ -31,12 +31,16 @@ router.get('/:serial/stream', (req, res) => {
   // Get printer credentials
   const printer = db.prepare('SELECT * FROM printers WHERE serial = ? AND is_active = 1').get(serial);
   if (!printer) return res.status(404).json({ error: 'Printer not found' });
-  if (!printer.ip_address || !printer.access_code) {
-    return res.status(400).json({ error: 'Printer missing IP or access code' });
+  // Use camera-specific IP and code if set, otherwise fall back to printer's LAN settings
+  const cameraIp = printer.camera_ip || printer.ip_address;
+  const cameraCode = printer.camera_access_code || printer.access_code;
+
+  if (!cameraIp || !cameraCode) {
+    return res.status(400).json({ error: 'No camera IP or access code configured for this printer' });
   }
 
   // Build RTSPS URL — Bambu uses bblp as username, access_code as password
-  const rtspUrl = `rtsps://bblp:${printer.access_code}@${printer.ip_address}:322/streaming/live/1`;
+  const rtspUrl = `rtsps://bblp:${cameraCode}@${cameraIp}:322/streaming/live/1`;
 
   logger.info(`[Camera] Starting stream for ${printer.name} (${serial})`);
 

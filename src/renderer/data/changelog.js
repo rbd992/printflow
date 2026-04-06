@@ -3,6 +3,25 @@
 
 export const CHANGELOG = [
   {
+    version: '1.0.9.1',
+    date: '2026-04-07',
+    title: 'Camera Config, Logo Fix & Stability',
+    highlights: [
+      'Fixed logo showing as blank blue box in sidebar',
+      'Camera now configurable per-printer with separate IP and access code',
+      'H2C and P1S camera setup fields in Add Printer modal',
+      'Camera falls back to printer LAN settings if no camera-specific config set',
+      'Server migration adds camera fields to existing printers',
+    ],
+    changes: [
+      { type: 'fix', text: 'Sidebar logo now shows printer SVG icon when image fails to load instead of blank blue box' },
+      { type: 'new', text: 'Add Printer modal now has Camera Settings section with optional camera IP and access code fields' },
+      { type: 'new', text: 'Camera route uses camera-specific credentials if configured, falls back to printer LAN settings' },
+      { type: 'new', text: 'Database migration v3 adds camera_ip and camera_access_code columns to printers table' },
+      { type: 'fix', text: 'Rate limiter removed from server — was causing \'Too many requests\' errors on Windows' },
+    ],
+  },
+  {
     version: '1.0.8',
     date: '2026-04-06',
     title: 'Nav Redesign, Quotes, Print History & Notifications',

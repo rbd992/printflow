@@ -186,6 +186,16 @@ const migrations = [
         ('Amazon Canada',        'https://amazon.ca',                 'Prime shipping');
     `,
   },
+  {
+    version: 3,
+    name: 'add_camera_fields_to_printers',
+    sql: `
+      ALTER TABLE printers ADD COLUMN camera_ip TEXT;
+      ALTER TABLE printers ADD COLUMN camera_access_code TEXT;
+      ALTER TABLE printers ADD COLUMN connection_mode TEXT DEFAULT 'lan';
+      ALTER TABLE printers ADD COLUMN bambu_uid TEXT;
+    `,
+  },
 ];
 
 function runMigrations() {

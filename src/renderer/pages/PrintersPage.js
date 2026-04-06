@@ -33,6 +33,11 @@ function CameraFeed({ printer, token }) {
   const serverUrl = getServerUrl();
   const streamUrl = `${serverUrl}/api/camera/${printer.serial}/stream`;
 
+  // Camera may use different IP/access code if configured separately
+  const cameraIp = printer.camera_ip || printer.ip_address;
+  const cameraCode = printer.camera_access_code || printer.access_code;
+  const hasCamera = !!(cameraIp && cameraCode);
+
   function startStream() {
     setLoading(true);
     setError(null);
@@ -215,7 +220,7 @@ function CloudLoginModal({ onClose, onSuccess }) {
   );
 }
 
-const BLANK = { name:'',model:'P1S',serial:'',ip_address:'',access_code:'',has_ams:true,ams_count:4,notes:'' };
+const BLANK = { name:'',model:'P1S',serial:'',ip_address:'',access_code:'',has_ams:true,ams_count:4,notes:'',camera_ip:'',camera_access_code:'' };
 
 export default function PrintersPage() {
   const [printers,setPrinters] = useState([]);
@@ -256,6 +261,8 @@ export default function PrintersPage() {
         name:form.name, model:form.model, serial:form.serial.trim(),
         ip_address:form.ip_address.trim(), access_code:form.access_code.trim(),
         has_ams:form.has_ams, ams_count:parseInt(form.ams_count)||0, notes:form.notes,
+        camera_ip: form.camera_ip?.trim() || null,
+        camera_access_code: form.camera_access_code?.trim() || null,
       });
       // Connect via MQTT
       await api.post(`/api/bambu/connect/${form.serial.trim()}`).catch(()=>{});
@@ -448,6 +455,14 @@ export default function PrintersPage() {
             )}
           </div>
           <div className="form-group"><label className="label">Notes (optional)</label><input className="input" {...F('notes')} placeholder="e.g. Located in workshop" /></div>
+          <div style={{ fontSize:11,fontWeight:700,textTransform:'uppercase',letterSpacing:'0.06em',color:'var(--text-tertiary)',margin:'10px 0 6px',paddingTop:8,borderTop:'0.5px solid var(--border)' }}>Camera Settings (optional)</div>
+          <div style={{ fontSize:12,color:'var(--text-secondary)',marginBottom:10,lineHeight:1.5 }}>
+            Leave blank to use the same IP and access code as above. Only set these if your camera uses different credentials (e.g. H2C with separate camera IP).
+          </div>
+          <div className="form-row">
+            <div className="form-group"><label className="label">Camera IP Address</label><input className="input" {...F('camera_ip')} placeholder="Same as printer IP" style={{ fontFamily:'monospace' }} /></div>
+            <div className="form-group"><label className="label">Camera Access Code</label><input className="input" {...F('camera_access_code')} placeholder="Same as LAN code" style={{ fontFamily:'monospace' }} /></div>
+          </div>
           {err && <div style={{ color:'var(--red)',fontSize:12,marginBottom:8 }}>{err}</div>}
           <div style={{ display:'flex',gap:8,justifyContent:'flex-end',marginTop:8 }}>
             <button className="btn btn-secondary" onClick={()=>setShowAdd(false)}>Cancel</button>
