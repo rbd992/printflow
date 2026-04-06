@@ -1,0 +1,66 @@
+version: "3.9"
+
+# PrintFlow — Synology NAS deployment
+# Usage:
+#   1. Copy this file and .env.example to your NAS
+#   2. Rename .env.example to .env and fill in your values
+#   3. mkdir -p /volume1/printflow/data /volume1/printflow/logs
+#   4. chmod -R 777 /volume1/printflow
+#   5. docker compose build
+#   6. docker compose up -d
+#   7. docker compose exec printflow-server node src/db/seed.js
+
+services:
+  printflow-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: printflow-server:latest
+    container_name: printflow-server
+    restart: unless-stopped
+
+    ports:
+      - "3001:3001"
+
+    env_file:
+      - .env
+
+    volumes:
+      - printflow-data:/app/data
+      - printflow-logs:/app/logs
+      - /volume1/printflow1/server/src:/app/src:ro
+
+    networks:
+      - printflow-net
+
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "5"
+
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 25s
+
+volumes:
+  printflow-data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /volume1/printflow1/data
+
+  printflow-logs:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /volume1/printflow1/logs
+
+networks:
+  printflow-net:
+    driver: bridge

@@ -1,0 +1,44 @@
+name: Deploy Server
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'server/**'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Tailscale
+        uses: tailscale/github-action@v2
+        with:
+          authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
+
+      - name: Copy server changes to NAS and deploy
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.NAS_SSH_KEY }}" > ~/.ssh/nas_key
+          chmod 600 ~/.ssh/nas_key
+          echo -e "Host *\n  StrictHostKeyChecking no\n  BatchMode yes" > ~/.ssh/config
+
+          NAS="admin@100.68.105.76"
+
+          echo "Copying updated server files to NAS..."
+          # Copy each changed file via SSH pipe (bypasses SFTP restriction)
+          for file in $(find server -type f | grep -v node_modules | grep -v .env); do
+            remote_path="/volume1/printflow1/$file"
+            dir=$(dirname $remote_path)
+            ssh -i ~/.ssh/nas_key $NAS "mkdir -p $dir"
+            cat "$file" | ssh -i ~/.ssh/nas_key $NAS "cat > $remote_path"
+            echo "  Copied: $file"
+          done
+
+          echo "Running deploy script on NAS..."
+          ssh -i ~/.ssh/nas_key $NAS "bash /volume1/printflow1/deploy_server.sh"
+
+          echo "Server deployed successfully!"
