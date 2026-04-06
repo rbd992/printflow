@@ -1,7 +1,7 @@
 {
   "name": "printflow",
   "version": "1.0.10",
-  "description": "PrintFlow \u2014 3D Print Business Suite",
+  "description": "PrintFlow — 3D Print Business Suite",
   "main": "src/main/main.js",
   "author": "Robert Dunn",
   "homepage": "./",
@@ -38,7 +38,7 @@
   "build": {
     "appId": "com.printflow.app",
     "productName": "PrintFlow",
-    "copyright": "Copyright \u00a9 2026 PrintFlow",
+    "copyright": "Copyright © 2026 PrintFlow",
     "extends": null,
     "extraMetadata": {
       "main": "src/main/main.js"
