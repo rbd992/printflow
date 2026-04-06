@@ -1,6 +1,6 @@
 {
   "name": "printflow",
-  "version": "1.0.11",
+  "version": "1.0.12",
   "description": "PrintFlow — 3D Print Business Suite",
   "main": "src/main/main.js",
   "author": "Robert Dunn",

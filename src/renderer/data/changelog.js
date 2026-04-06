@@ -3,6 +3,24 @@
 
 export const CHANGELOG = [
   {
+    version: '1.0.12',
+    date: '2026-04-07',
+    title: 'Printer Edit Fix, Release Notes & About',
+    highlights: [
+      'Fixed printer edit modal — inputs no longer lose focus when typing',
+      'Release notes viewer — click “i” in the sidebar footer to see full changelog',
+      'Update banner now shows release title and a Notes button',
+      'Printer edit modal fully functional for IP, access code, camera settings',
+    ],
+    changes: [
+      { type: 'fix',     text: 'Printers — Edit modal inputs lost focus on every keystroke due to component defined inside render; moved PrinterForm outside the page component' },
+      { type: 'new',     text: 'Release Notes modal — click the “i” button in the sidebar footer to browse all version history with full changelogs' },
+      { type: 'new',     text: 'Update banner now shows the release title and a Notes button that opens the release notes for that version' },
+      { type: 'new',     text: 'Printer edit modal now correctly pre-populates all fields including access code and camera settings' },
+      { type: 'improve', text: 'Version strings now consistent across AppShell, LoginPage, and package.json' },
+    ],
+  },
+  {
     version: '1.0.11',
     date: '2026-04-07',
     title: 'Comprehensive Bug Fixes & Polish',

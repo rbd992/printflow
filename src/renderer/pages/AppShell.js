@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
 import { onSocketEvent } from '../api/socket';
+import { CHANGELOG } from '../data/changelog';
 
 const ROLES = { owner:3, manager:2, operator:1 };
 function canAccess(userRole, minRole) { return (ROLES[userRole]||0) >= (ROLES[minRole]||0); }
@@ -118,6 +119,79 @@ const Icons = {
   ),
 };
 
+// ── Release Notes Modal ──────────────────────────────────────────────────
+function ReleaseNotesModal({ onClose, highlightVersion }) {
+  const [selected, setSelected] = useState(highlightVersion || CHANGELOG[0]?.version);
+  const entry = CHANGELOG.find(c => c.version === selected) || CHANGELOG[0];
+  const typeColor = { new:'var(--green)', fix:'var(--accent)', improve:'var(--amber)', remove:'var(--red)' };
+  const typeLabel = { new:'New', fix:'Fix', improve:'Improved', remove:'Removed' };
+
+  return (
+    <div style={{ position:'fixed',inset:0,zIndex:300,background:'rgba(0,0,0,0.65)',backdropFilter:'blur(10px)',display:'flex',alignItems:'center',justifyContent:'center',padding:24 }}
+      onClick={e=>e.target===e.currentTarget&&onClose()}>
+      <div className="card" style={{ width:700,maxHeight:'85vh',display:'flex',flexDirection:'column',animation:'fadeIn 0.2s ease' }}>
+        {/* Header */}
+        <div style={{ padding:'20px 24px',borderBottom:'0.5px solid var(--border)',display:'flex',justifyContent:'space-between',alignItems:'center',flexShrink:0 }}>
+          <div>
+            <h2 style={{ fontSize:18,marginBottom:2 }}>Release Notes</h2>
+            <div style={{ fontSize:12,color:'var(--text-tertiary)' }}>PrintFlow changelog</div>
+          </div>
+          <button className="btn btn-ghost btn-icon" onClick={onClose}>✕</button>
+        </div>
+
+        <div style={{ display:'flex',flex:1,overflow:'hidden' }}>
+          {/* Version list */}
+          <div style={{ width:160,borderRight:'0.5px solid var(--border)',overflowY:'auto',flexShrink:0 }}>
+            {CHANGELOG.map(c => (
+              <div key={c.version} onClick={()=>setSelected(c.version)}
+                style={{ padding:'10px 16px',cursor:'pointer',borderLeft:`3px solid ${selected===c.version?'var(--accent)':'transparent'}`,background:selected===c.version?'var(--accent-light)':'transparent',transition:'all 0.1s' }}>
+                <div style={{ fontSize:13,fontWeight:600,color:selected===c.version?'var(--accent)':'var(--text-primary)' }}>v{c.version}</div>
+                <div style={{ fontSize:10,color:'var(--text-tertiary)',marginTop:2 }}>{c.date}</div>
+                {c.version===CHANGELOG[0].version && <span style={{ fontSize:9,fontWeight:700,color:'var(--green)',textTransform:'uppercase',letterSpacing:'0.04em' }}>Latest</span>}
+              </div>
+            ))}
+          </div>
+
+          {/* Release detail */}
+          <div style={{ flex:1,overflowY:'auto',padding:'20px 24px' }}>
+            {entry && (
+              <>
+                <div style={{ marginBottom:16 }}>
+                  <div style={{ display:'flex',alignItems:'center',gap:10,marginBottom:6 }}>
+                    <h3 style={{ fontSize:16 }}>v{entry.version}</h3>
+                    <span style={{ fontSize:11,color:'var(--text-tertiary)' }}>{entry.date}</span>
+                  </div>
+                  <div style={{ fontSize:14,fontWeight:600,color:'var(--text-secondary)',marginBottom:12 }}>{entry.title}</div>
+                  {entry.highlights?.length > 0 && (
+                    <div style={{ padding:'12px 14px',background:'var(--accent-light)',borderRadius:'var(--r-sm)',marginBottom:16,borderLeft:'3px solid var(--accent)' }}>
+                      {entry.highlights.map((h,i)=>(
+                        <div key={i} style={{ fontSize:12,color:'var(--accent)',lineHeight:1.7 }}>· {h}</div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                {entry.changes?.length > 0 && (
+                  <div>
+                    <div style={{ fontSize:11,fontWeight:700,textTransform:'uppercase',letterSpacing:'0.06em',color:'var(--text-tertiary)',marginBottom:10 }}>All Changes</div>
+                    {entry.changes.map((c,i)=>(
+                      <div key={i} style={{ display:'flex',gap:10,padding:'7px 0',borderBottom:'0.5px solid var(--border)' }}>
+                        <span style={{ fontSize:10,fontWeight:700,padding:'2px 7px',borderRadius:6,flexShrink:0,marginTop:1,background:`${typeColor[c.type]}22`,color:typeColor[c.type] }}>
+                          {typeLabel[c.type]||c.type}
+                        </span>
+                        <span style={{ fontSize:12,color:'var(--text-secondary)',lineHeight:1.5 }}>{c.text}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Nav item ─────────────────────────────────────────────────────────────
 function NavItem({ to, icon, label, badge, minRole, userRole, end }) {
   if (minRole && !canAccess(userRole, minRole)) return null;
@@ -166,6 +240,8 @@ export default function AppShell({ theme, onThemeChange }) {
   const [updateInfo, setUpdateInfo]         = useState(null);
   const [updateDismissed, setUpdateDismissed] = useState(false);
   const [checkingUpdate, setCheckingUpdate] = useState(false);
+  const [showReleaseNotes, setShowReleaseNotes] = useState(false);
+  const [releaseNotesVersion, setReleaseNotesVersion] = useState(null);
   const isMac = window.printflow.platform === 'darwin';
   const role  = user?.role || 'operator';
 
@@ -261,7 +337,7 @@ export default function AppShell({ theme, onThemeChange }) {
           </div>
           <div>
             <div style={{ fontSize: 13, fontWeight: 700, letterSpacing: '-0.01em', lineHeight: 1.2 }}>PrintFlow</div>
-            <div style={{ fontSize: 10, color: 'var(--text-tertiary)', textTransform: 'capitalize', lineHeight: 1.4 }}>v1.0.11 · {role}</div>
+            <div style={{ fontSize: 10, color: 'var(--text-tertiary)', textTransform: 'capitalize', lineHeight: 1.4 }}>v1.0.12 · {role}</div>
           </div>
         </div>
 
@@ -302,15 +378,26 @@ export default function AppShell({ theme, onThemeChange }) {
 
         {/* Update banner */}
         {updateInfo && !updateDismissed && (
-          <div style={{ margin: '4px 8px', padding: '10px 12px', background: 'linear-gradient(135deg,rgba(0,113,227,0.15),rgba(0,113,227,0.05))', borderRadius: 8, border: '0.5px solid rgba(0,113,227,0.3)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 }}>
+          <div style={{ margin: '4px 8px', padding: '12px', background: 'linear-gradient(135deg,rgba(0,113,227,0.15),rgba(0,113,227,0.05))', borderRadius: 8, border: '0.5px solid rgba(0,113,227,0.3)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--accent)' }}>Update Available</div>
-              <button onClick={() => setUpdateDismissed(true)} style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: 12, padding: 0, lineHeight: 1 }}>✕</button>
+              <button onClick={() => setUpdateDismissed(true)} style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: 12, padding: 0 }}>✕</button>
             </div>
-            <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginBottom: 8 }}>v{updateInfo.latestVersion} is ready</div>
-            <button className="btn btn-primary btn-sm" style={{ width: '100%', justifyContent: 'center', fontSize: 11 }} onClick={downloadUpdate}>
-              ↓ Download v{updateInfo.latestVersion}
-            </button>
+            <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 2 }}>v{updateInfo.latestVersion}</div>
+            {CHANGELOG.find(c => c.version === updateInfo.latestVersion)?.title && (
+              <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginBottom: 8, lineHeight: 1.4 }}>
+                {CHANGELOG.find(c => c.version === updateInfo.latestVersion)?.title}
+              </div>
+            )}
+            <div style={{ display: 'flex', gap: 6 }}>
+              <button className="btn btn-primary btn-sm" style={{ flex: 1, justifyContent: 'center', fontSize: 11 }} onClick={downloadUpdate}>
+                ↓ Download
+              </button>
+              <button className="btn btn-ghost btn-sm" style={{ fontSize: 11, color: 'var(--accent)' }}
+                onClick={() => { setReleaseNotesVersion(updateInfo.latestVersion); setShowReleaseNotes(true); }}>
+                Notes
+              </button>
+            </div>
           </div>
         )}
 
@@ -330,6 +417,9 @@ export default function AppShell({ theme, onThemeChange }) {
             <button className="btn btn-ghost btn-icon no-drag" onClick={toggleTheme} title="Toggle theme" style={{ padding: 4, fontSize: 13 }}>
               {theme === 'dark' ? '☀' : '☾'}
             </button>
+            <button className="btn btn-ghost btn-icon no-drag" title="About & Release Notes"
+              onClick={() => { setReleaseNotesVersion(null); setShowReleaseNotes(true); }}
+              style={{ padding: 4, fontSize: 11, fontWeight: 700, color: 'var(--text-tertiary)' }}>i</button>
             <button className="btn btn-ghost btn-icon no-drag" onClick={async () => { await logout(); navigate('/login'); }} title="Sign out" style={{ padding: 4 }}>
               {Icons.logout}
             </button>
@@ -365,6 +455,14 @@ export default function AppShell({ theme, onThemeChange }) {
           <Outlet />
         </main>
       </div>
+
+      {/* Release Notes Modal */}
+      {showReleaseNotes && (
+        <ReleaseNotesModal
+          onClose={() => setShowReleaseNotes(false)}
+          highlightVersion={releaseNotesVersion}
+        />
+      )}
     </div>
   );
 }

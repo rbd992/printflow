@@ -2,7 +2,9 @@ import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { api, getServerUrl } from '../api/client';
 import { onSocketEvent } from '../api/socket';
 import { useAuthStore } from '../stores/authStore';
+import { CHANGELOG } from '../data/changelog';
 
+// ── Helpers ──────────────────────────────────────────────────────────────────
 function Modal({ title, onClose, children, width=480 }) {
   return (
     <div style={{ position:'fixed',inset:0,zIndex:200,background:'rgba(0,0,0,0.6)',backdropFilter:'blur(8px)',display:'flex',alignItems:'center',justifyContent:'center' }}
@@ -23,7 +25,95 @@ function StatusDot({ status }) {
   return <div style={{ width:10,height:10,borderRadius:'50%',background:c,boxShadow:`0 0 6px ${c}`,flexShrink:0 }}/>;
 }
 
-// ── Camera Feed ─────────────────────────────────────────────────────────────
+// ── Printer form — defined OUTSIDE the page component to avoid remount bugs ──
+function PrinterForm({ form, setForm, isEdit }) {
+  const F = k => ({ value: form[k] ?? '', onChange: e => setForm(f => ({ ...f, [k]: e.target.value })) });
+  return (
+    <>
+      <div className="form-row">
+        <div className="form-group">
+          <label className="label">Printer Name</label>
+          <input className="input" {...F('name')} placeholder="e.g. P1S Left" autoFocus />
+        </div>
+        <div className="form-group">
+          <label className="label">Model</label>
+          <select className="select" {...F('model')}>
+            {['P1S','P1P','H2C','H2D','X1C','A1','A1 Mini'].map(m=><option key={m}>{m}</option>)}
+          </select>
+        </div>
+      </div>
+
+      {isEdit ? (
+        <div className="form-group">
+          <label className="label">Serial Number</label>
+          <div style={{ padding:'8px 12px',background:'var(--bg-hover)',borderRadius:'var(--r-sm)',fontFamily:'monospace',fontSize:13,color:'var(--text-tertiary)' }}>
+            {form.serial}
+          </div>
+          <div style={{ fontSize:11,color:'var(--text-tertiary)',marginTop:3 }}>Serial cannot be changed after registration</div>
+        </div>
+      ) : (
+        <div className="form-group">
+          <label className="label">Serial Number</label>
+          <input className="input" {...F('serial')} placeholder="e.g. 01P00A123456789" style={{ fontFamily:'monospace' }} />
+        </div>
+      )}
+
+      <div className="form-row">
+        <div className="form-group">
+          <label className="label">IP Address</label>
+          <input className="input" {...F('ip_address')} placeholder="e.g. 10.0.0.150" style={{ fontFamily:'monospace' }} />
+        </div>
+        <div className="form-group">
+          <label className="label">LAN Access Code</label>
+          <input className="input" {...F('access_code')} placeholder="8-digit code" style={{ fontFamily:'monospace' }} />
+        </div>
+      </div>
+
+      <div className="form-row">
+        <div className="form-group" style={{ display:'flex',alignItems:'center',gap:8,paddingTop:20 }}>
+          <input type="checkbox" id="pf_has_ams" checked={!!form.has_ams}
+            onChange={e=>setForm(f=>({...f,has_ams:e.target.checked}))} style={{ width:16,height:16 }} />
+          <label htmlFor="pf_has_ams" style={{ fontSize:13,cursor:'pointer' }}>Has AMS unit</label>
+        </div>
+        {form.has_ams && (
+          <div className="form-group">
+            <label className="label">AMS Tray Count</label>
+            <select className="select" {...F('ams_count')}>
+              <option value="4">4 trays</option>
+              <option value="8">8 trays (2× AMS)</option>
+              <option value="16">16 trays (4× AMS)</option>
+            </select>
+          </div>
+        )}
+      </div>
+
+      <div className="form-group">
+        <label className="label">Notes (optional)</label>
+        <input className="input" {...F('notes')} placeholder="e.g. Located in workshop" />
+      </div>
+
+      <div style={{ fontSize:11,fontWeight:700,textTransform:'uppercase',letterSpacing:'0.06em',color:'var(--text-tertiary)',margin:'14px 0 6px',paddingTop:12,borderTop:'0.5px solid var(--border)' }}>
+        Camera Settings
+      </div>
+      <div style={{ padding:'8px 12px',background:'var(--bg-hover)',borderRadius:'var(--r-sm)',fontSize:12,color:'var(--text-secondary)',marginBottom:10,lineHeight:1.5 }}>
+        Leave blank to use the printer IP and access code above. Only needed if your camera uses different credentials.
+        <br/><strong>H2C/H2D:</strong> Enable "LAN Mode Liveview" in printer Settings → Network first.
+      </div>
+      <div className="form-row">
+        <div className="form-group">
+          <label className="label">Camera IP Address</label>
+          <input className="input" {...F('camera_ip')} placeholder="Same as printer IP" style={{ fontFamily:'monospace' }} />
+        </div>
+        <div className="form-group">
+          <label className="label">Camera Access Code</label>
+          <input className="input" {...F('camera_access_code')} placeholder="Same as LAN code" style={{ fontFamily:'monospace' }} />
+        </div>
+      </div>
+    </>
+  );
+}
+
+// ── Camera Feed ───────────────────────────────────────────────────────────────
 function CameraFeed({ printer, token }) {
   const [streaming, setStreaming] = useState(false);
   const [error, setError]         = useState(null);
@@ -40,15 +130,19 @@ function CameraFeed({ printer, token }) {
   function handleLoad() { setLoading(false); }
   function handleError() {
     setLoading(false);
-    setError('Could not connect to camera.\n• Enable "LAN Mode Liveview" on the printer (Settings → Network → LAN Mode Liveview)\n• Verify the camera IP and access code are correct\n• Make sure ffmpeg is installed on the server (rebuild via Task Scheduler)');
+    setError('Could not connect to camera.\n• Enable "LAN Mode Liveview" in printer Settings → Network\n• Verify the IP and access code are correct\n• ffmpeg must be installed on the server (rebuild via Task Scheduler)');
     setStreaming(false);
   }
-  useEffect(() => () => { if (streaming) api.delete(`/api/camera/${printer.serial}/stream`).catch(()=>{}); }, [streaming, printer.serial]);
+
+  useEffect(() => {
+    return () => { if (streaming) api.delete(`/api/camera/${printer.serial}/stream`).catch(()=>{}); };
+  }, [streaming, printer.serial]);
 
   return (
     <div style={{ marginTop:12 }}>
       {!streaming ? (
-        <button className="btn btn-ghost btn-sm" onClick={e=>{e.stopPropagation();startStream();}}
+        <button className="btn btn-ghost btn-sm"
+          onClick={e=>{ e.stopPropagation(); startStream(); }}
           style={{ fontSize:11,color:'var(--accent)',width:'100%',justifyContent:'center',border:'0.5px solid var(--accent)',borderRadius:'var(--r-sm)',padding:'6px 0' }}>
           📹 View Camera
         </button>
@@ -60,13 +154,16 @@ function CameraFeed({ printer, token }) {
               <div style={{ fontSize:11,color:'var(--text-secondary)' }}>Connecting to camera...</div>
             </div>
           )}
-          <img ref={imgRef} src={`${streamUrl}?token=${encodeURIComponent(token)}&t=${Date.now()}`}
-            alt={`${printer.name} camera`} onLoad={handleLoad} onError={handleError}
-            onClick={e=>e.stopPropagation()} style={{ width:'100%',display:'block',maxHeight:240,objectFit:'cover' }} />
+          <img ref={imgRef}
+            src={`${streamUrl}?token=${encodeURIComponent(token)}&t=${Date.now()}`}
+            alt={`${printer.name} camera`}
+            onLoad={handleLoad} onError={handleError}
+            onClick={e=>e.stopPropagation()}
+            style={{ width:'100%',display:'block',maxHeight:240,objectFit:'cover' }} />
           <div style={{ position:'absolute',top:6,right:6,display:'flex',gap:4 }}>
-            <button onClick={e=>{e.stopPropagation();window.printflow.openExternal(`${streamUrl}?token=${encodeURIComponent(token)}`);}}
-              style={{ background:'rgba(0,0,0,0.6)',border:'none',color:'#fff',borderRadius:4,padding:'3px 7px',fontSize:10,cursor:'pointer' }}>⛶</button>
-            <button onClick={e=>{e.stopPropagation();stopStream();}}
+            <button onClick={e=>{ e.stopPropagation(); window.printflow.openExternal(`${streamUrl}?token=${encodeURIComponent(token)}`); }}
+              style={{ background:'rgba(0,0,0,0.6)',border:'none',color:'#fff',borderRadius:4,padding:'3px 7px',fontSize:10,cursor:'pointer' }} title="Open fullscreen">⛶</button>
+            <button onClick={e=>{ e.stopPropagation(); stopStream(); }}
               style={{ background:'rgba(0,0,0,0.6)',border:'none',color:'#fff',borderRadius:4,padding:'3px 7px',fontSize:10,cursor:'pointer' }}>✖ Stop</button>
           </div>
           <div style={{ position:'absolute',top:6,left:6,background:'var(--red)',color:'#fff',fontSize:9,fontWeight:700,padding:'2px 6px',borderRadius:4,letterSpacing:'0.05em' }}>LIVE</div>
@@ -78,30 +175,30 @@ function CameraFeed({ printer, token }) {
         </div>
       )}
       {!streaming && !error && (
-        <div style={{ marginTop:4,fontSize:10,color:'var(--text-tertiary)',textAlign:'center',lineHeight:1.5 }}>
-          Enable "LAN Mode Liveview" in printer settings first
+        <div style={{ marginTop:4,fontSize:10,color:'var(--text-tertiary)',textAlign:'center' }}>
+          Requires "LAN Mode Liveview" enabled on printer
         </div>
       )}
     </div>
   );
 }
 
-// ── Cloud Login Modal ────────────────────────────────────────────────────────
+// ── Cloud Login Modal ─────────────────────────────────────────────────────────
 function CloudLoginModal({ onClose, onSuccess }) {
-  const [step, setStep]         = useState('login');
-  const [email, setEmail]       = useState('');
-  const [password, setPassword] = useState('');
-  const [code, setCode]         = useState('');
-  const [loading, setLoading]   = useState(false);
-  const [err, setErr]           = useState('');
-  const [msg, setMsg]           = useState('');
+  const [step, setStep]     = useState('login');
+  const [email, setEmail]   = useState('');
+  const [password, setPass] = useState('');
+  const [code, setCode]     = useState('');
+  const [loading, setLoading] = useState(false);
+  const [err, setErr]       = useState('');
+  const [msg, setMsg]       = useState('');
 
   async function doLogin() {
     setLoading(true); setErr('');
     try {
       const r = await api.post('/api/bambu/cloud/login', { email, password });
-      if (r.data.noTfa) { setStep('done'); setMsg('Connected to Bambu Cloud!'); onSuccess(); }
-      else { setStep('verify'); setMsg(`Check ${email} for your 6-digit code.`); }
+      if (r.data.noTfa) { setStep('done'); setMsg('Connected!'); onSuccess(); }
+      else { setStep('verify'); setMsg(`Check ${email} for your code.`); }
     } catch(e) { setErr(e.response?.data?.error||'Login failed'); }
     finally { setLoading(false); }
   }
@@ -121,14 +218,11 @@ function CloudLoginModal({ onClose, onSuccess }) {
         <div style={{ textAlign:'center',padding:'20px 0' }}>
           <div style={{ fontSize:48,marginBottom:12 }}>✅</div>
           <div style={{ fontSize:15,fontWeight:600,marginBottom:8 }}>Bambu Cloud Connected</div>
-          <div style={{ fontSize:13,color:'var(--text-secondary)',marginBottom:20 }}>{msg}</div>
           <button className="btn btn-primary" style={{ width:'100%',justifyContent:'center' }} onClick={onClose}>Done</button>
         </div>
       ) : step==='verify' ? (
         <div>
-          <div style={{ fontSize:13,color:'var(--text-secondary)',marginBottom:16,padding:'10px 14px',background:'var(--accent-light)',borderRadius:'var(--r-sm)' }}>
-            {msg} Enter the 6-digit code below.
-          </div>
+          <div style={{ fontSize:13,color:'var(--text-secondary)',marginBottom:16,padding:'10px 14px',background:'var(--accent-light)',borderRadius:'var(--r-sm)' }}>{msg}</div>
           <div className="form-group">
             <label className="label">Verification Code</label>
             <input className="input" value={code} onChange={e=>setCode(e.target.value)} placeholder="123456"
@@ -144,14 +238,11 @@ function CloudLoginModal({ onClose, onSuccess }) {
         </div>
       ) : (
         <div>
-          <div style={{ fontSize:13,color:'var(--text-secondary)',marginBottom:16 }}>
-            Sign in with your Bambu Lab account to enable Cloud Mode.
-          </div>
           <div style={{ padding:'10px 14px',background:'var(--amber-light)',borderRadius:'var(--r-sm)',fontSize:12,color:'var(--amber)',marginBottom:16,lineHeight:1.5 }}>
-            <strong>Note:</strong> Cloud Mode uses Bambu's unofficial API. LAN Mode is the most stable option for local use.
+            <strong>Note:</strong> LAN Mode is the most stable option. Cloud Mode uses Bambu's unofficial API and may break with firmware updates.
           </div>
           <div className="form-group"><label className="label">Bambu Account Email</label><input className="input" type="email" value={email} onChange={e=>setEmail(e.target.value)} autoFocus /></div>
-          <div className="form-group"><label className="label">Password</label><input className="input" type="password" value={password} onChange={e=>setPassword(e.target.value)} /></div>
+          <div className="form-group"><label className="label">Password</label><input className="input" type="password" value={password} onChange={e=>setPass(e.target.value)} /></div>
           {err && <div style={{ color:'var(--red)',fontSize:12,marginBottom:8 }}>{err}</div>}
           <div style={{ display:'flex',gap:8 }}>
             <button className="btn btn-secondary" onClick={onClose}>Cancel</button>
@@ -165,200 +256,160 @@ function CloudLoginModal({ onClose, onSuccess }) {
   );
 }
 
+// ── Blank form ────────────────────────────────────────────────────────────────
 const BLANK = { name:'',model:'P1S',serial:'',ip_address:'',access_code:'',has_ams:true,ams_count:4,notes:'',camera_ip:'',camera_access_code:'' };
 
+// ── Main page ─────────────────────────────────────────────────────────────────
 export default function PrintersPage() {
-  const [printers,setPrinters]   = useState([]);
-  const [liveStates,setLiveStates] = useState({});
-  const [loading,setLoading]     = useState(true);
-  const [showAdd,setShowAdd]     = useState(false);
-  const [showEdit,setShowEdit]   = useState(false);
-  const [editingPrinter,setEditingPrinter] = useState(null);
-  const [form,setForm]           = useState(BLANK);
-  const [saving,setSaving]       = useState(false);
-  const [err,setErr]             = useState('');
-  const [selected,setSelected]   = useState(null);
-  const [showCloud,setShowCloud] = useState(false);
+  const [printers, setPrinters]           = useState([]);
+  const [liveStates, setLiveStates]       = useState({});
+  const [loading, setLoading]             = useState(true);
+  const [showAdd, setShowAdd]             = useState(false);
+  const [showEdit, setShowEdit]           = useState(false);
+  const [editingPrinter, setEditingPrinter] = useState(null);
+  const [form, setForm]                   = useState(BLANK);
+  const [saving, setSaving]               = useState(false);
+  const [err, setErr]                     = useState('');
+  const [showCloud, setShowCloud]         = useState(false);
   const { user } = useAuthStore();
   const isOwner = user?.role === 'owner';
-  const token = useAuthStore(s => s.token);
+  const token   = useAuthStore(s => s.token);
 
-  const load = useCallback(async()=>{
+  const load = useCallback(async () => {
     try {
-      const r = await api.get('/api/printers');
+      const r  = await api.get('/api/printers');
+      const ls = await api.get('/api/bambu/status').catch(() => ({ data: {} }));
       setPrinters(r.data);
-      const ls = await api.get('/api/bambu/status').catch(()=>({data:{}}));
-      setLiveStates(ls.data||{});
+      setLiveStates(ls.data || {});
     } catch {}
     finally { setLoading(false); }
-  },[]);
+  }, []);
 
-  useEffect(()=>{
+  useEffect(() => {
     load();
-    const u1=onSocketEvent('printer:status',s=>setLiveStates(p=>({...p,[s.serial]:s})));
-    const u2=onSocketEvent('printer:registered',()=>load());
-    const u3=onSocketEvent('printer:tray_updated',()=>load());
-    return()=>{u1();u2();u3();};
-  },[load]);
+    const u1 = onSocketEvent('printer:status',   s => setLiveStates(p => ({ ...p, [s.serial]: s })));
+    const u2 = onSocketEvent('printer:registered', () => load());
+    const u3 = onSocketEvent('printer:tray_updated', () => load());
+    const u4 = onSocketEvent('printer:updated',  () => load());
+    return () => { u1(); u2(); u3(); u4(); };
+  }, [load]);
 
+  // ── Add printer ────────────────────────────────────────────────────────────
   async function addPrinter() {
     setSaving(true); setErr('');
     try {
-      await api.post('/api/printers',{
-        name:form.name, model:form.model, serial:form.serial.trim(),
-        ip_address:form.ip_address.trim(), access_code:form.access_code.trim(),
-        has_ams:form.has_ams, ams_count:parseInt(form.ams_count)||0, notes:form.notes,
-        camera_ip: form.camera_ip?.trim() || null,
-        camera_access_code: form.camera_access_code?.trim() || null,
+      await api.post('/api/printers', {
+        name:                form.name,
+        model:               form.model,
+        serial:              form.serial.trim(),
+        ip_address:          form.ip_address.trim(),
+        access_code:         form.access_code.trim(),
+        has_ams:             form.has_ams,
+        ams_count:           parseInt(form.ams_count) || 0,
+        notes:               form.notes,
+        camera_ip:           form.camera_ip?.trim() || null,
+        camera_access_code:  form.camera_access_code?.trim() || null,
       });
-      await api.post(`/api/bambu/connect/${form.serial.trim()}`).catch(()=>{});
-      setShowAdd(false); setForm(BLANK); await load();
-    } catch(e) { setErr(e.response?.data?.error||'Failed to add printer'); }
+      await api.post(`/api/bambu/connect/${form.serial.trim()}`).catch(() => {});
+      setShowAdd(false);
+      setForm(BLANK);
+      await load();
+    } catch(e) { setErr(e.response?.data?.error || 'Failed to add printer'); }
     finally { setSaving(false); }
   }
 
-  async function savePrinterEdit() {
-    setSaving(true); setErr('');
-    try {
-      await api.patch(`/api/printers/${editingPrinter.id}`, {
-        name: form.name,
-        model: form.model,
-        ip_address: form.ip_address.trim(),
-        access_code: form.access_code.trim(),
-        has_ams: form.has_ams,
-        ams_count: parseInt(form.ams_count) || 0,
-        notes: form.notes,
-        camera_ip: form.camera_ip?.trim() || null,
-        camera_access_code: form.camera_access_code?.trim() || null,
-      });
-      setShowEdit(false); setEditingPrinter(null); await load();
-    } catch(e) { setErr(e.response?.data?.error || 'Failed to save'); }
-    finally { setSaving(false); }
-  }
-
+  // ── Edit existing printer ──────────────────────────────────────────────────
   function openEdit(printer) {
     setForm({
-      name: printer.name,
-      model: printer.model,
-      serial: printer.serial,
-      ip_address: printer.ip_address,
-      access_code: printer.access_code || '',
-      has_ams: !!printer.has_ams,
-      ams_count: printer.ams_count || 4,
-      notes: printer.notes || '',
-      camera_ip: printer.camera_ip || '',
-      camera_access_code: printer.camera_access_code || '',
+      name:                printer.name       || '',
+      model:               printer.model      || 'P1S',
+      serial:              printer.serial     || '',
+      ip_address:          printer.ip_address || '',
+      access_code:         printer.access_code         || '',
+      has_ams:             !!printer.has_ams,
+      ams_count:           printer.ams_count  || 4,
+      notes:               printer.notes      || '',
+      camera_ip:           printer.camera_ip  || '',
+      camera_access_code:  printer.camera_access_code || '',
     });
     setEditingPrinter(printer);
     setErr('');
     setShowEdit(true);
   }
 
+  async function savePrinterEdit() {
+    setSaving(true); setErr('');
+    try {
+      await api.patch(`/api/printers/${editingPrinter.id}`, {
+        name:               form.name,
+        model:              form.model,
+        ip_address:         form.ip_address.trim(),
+        access_code:        form.access_code.trim(),
+        has_ams:            form.has_ams,
+        ams_count:          parseInt(form.ams_count) || 0,
+        notes:              form.notes,
+        camera_ip:          form.camera_ip?.trim() || null,
+        camera_access_code: form.camera_access_code?.trim() || null,
+      });
+      setShowEdit(false);
+      setEditingPrinter(null);
+      await load();
+    } catch(e) { setErr(e.response?.data?.error || 'Failed to save changes'); }
+    finally { setSaving(false); }
+  }
+
+  // ── Remove printer ─────────────────────────────────────────────────────────
   async function removePrinter(printer) {
-    if(!window.confirm(`Remove "${printer.name}" from PrintFlow?\n\nThe printer will be disconnected. This does not affect the printer itself.`)) return;
+    if (!window.confirm(`Remove "${printer.name}" from PrintFlow?\n\nThis disconnects the printer but does not affect the physical device.`)) return;
     try {
       await api.delete(`/api/printers/${printer.id}`);
-      setSelected(null); await load();
-    } catch(e) { alert(e.response?.data?.error||'Failed to remove printer'); }
+      setShowEdit(false);
+      setEditingPrinter(null);
+      await load();
+    } catch(e) { alert(e.response?.data?.error || 'Failed to remove printer'); }
   }
 
   async function sendCommand(serial, cmd) {
     try { await api.post(`/api/bambu/${serial}/${cmd}`); }
-    catch(e) { alert(`Command failed: ${e.response?.data?.error||e.message}`); }
+    catch(e) { alert(`Command failed: ${e.response?.data?.error || e.message}`); }
   }
 
-  const F = k => ({ value:form[k]??'', onChange:e=>setForm(f=>({...f,[k]:e.target.value})) });
-
-  // Reusable printer form fields
-  function PrinterFormFields({ isEdit }) {
-    return (
-      <>
-        <div className="form-row">
-          <div className="form-group"><label className="label">Printer Name</label><input className="input" {...F('name')} placeholder="e.g. P1S Left" autoFocus /></div>
-          <div className="form-group"><label className="label">Model</label>
-            <select className="select" {...F('model')}>
-              {['P1S','P1P','H2C','H2D','X1C','A1','A1 Mini'].map(m=><option key={m}>{m}</option>)}
-            </select>
-          </div>
-        </div>
-        {!isEdit && (
-          <div className="form-group"><label className="label">Serial Number</label>
-            <input className="input" {...F('serial')} placeholder="e.g. 01P00A123456789" style={{ fontFamily:'monospace' }} />
-          </div>
-        )}
-        {isEdit && (
-          <div className="form-group">
-            <label className="label">Serial Number</label>
-            <div className="input" style={{ background:'var(--bg-hover)',color:'var(--text-tertiary)',fontFamily:'monospace',cursor:'not-allowed' }}>{form.serial}</div>
-            <div style={{ fontSize:11,color:'var(--text-tertiary)',marginTop:3 }}>Serial cannot be changed after registration</div>
-          </div>
-        )}
-        <div className="form-row">
-          <div className="form-group"><label className="label">IP Address</label><input className="input" {...F('ip_address')} placeholder="e.g. 10.0.0.150" style={{ fontFamily:'monospace' }} /></div>
-          <div className="form-group"><label className="label">LAN Access Code</label><input className="input" {...F('access_code')} placeholder="8-digit code" style={{ fontFamily:'monospace' }} /></div>
-        </div>
-        <div className="form-row">
-          <div className="form-group" style={{ display:'flex',alignItems:'center',gap:8,paddingTop:20 }}>
-            <input type="checkbox" id="has_ams" checked={!!form.has_ams} onChange={e=>setForm(f=>({...f,has_ams:e.target.checked}))} style={{ width:16,height:16 }} />
-            <label htmlFor="has_ams" style={{ fontSize:13,cursor:'pointer' }}>Has AMS unit</label>
-          </div>
-          {form.has_ams && (
-            <div className="form-group"><label className="label">AMS Tray Count</label>
-              <select className="select" {...F('ams_count')}><option value="4">4 trays</option><option value="8">8 trays (2x AMS)</option><option value="16">16 trays (4x AMS)</option></select>
-            </div>
-          )}
-        </div>
-        <div className="form-group"><label className="label">Notes (optional)</label><input className="input" {...F('notes')} placeholder="e.g. Located in workshop" /></div>
-        <div style={{ fontSize:11,fontWeight:700,textTransform:'uppercase',letterSpacing:'0.06em',color:'var(--text-tertiary)',margin:'12px 0 6px',paddingTop:10,borderTop:'0.5px solid var(--border)' }}>
-          Camera Settings
-        </div>
-        <div style={{ padding:'8px 12px',background:'var(--bg-hover)',borderRadius:'var(--r-sm)',fontSize:12,color:'var(--text-secondary)',marginBottom:10,lineHeight:1.5 }}>
-          Leave blank to use the printer's IP and access code. Set these only if your camera needs separate credentials.<br/>
-          <strong>H2C users:</strong> Enable "LAN Mode Liveview" in printer Settings → Network, then enter the camera IP here.
-        </div>
-        <div className="form-row">
-          <div className="form-group"><label className="label">Camera IP Address</label><input className="input" {...F('camera_ip')} placeholder="Same as printer IP" style={{ fontFamily:'monospace' }} /></div>
-          <div className="form-group"><label className="label">Camera Access Code</label><input className="input" {...F('camera_access_code')} placeholder="Same as LAN code" style={{ fontFamily:'monospace' }} /></div>
-        </div>
-      </>
-    );
-  }
-
+  // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <div style={{ height:'100%',overflowY:'auto',padding:24 }}>
       <div style={{ maxWidth:1200,margin:'0 auto' }}>
+
+        {/* Header */}
         <div style={{ display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:20 }}>
           <div>
             <h1>Printers</h1>
-            <p style={{ color:'var(--text-secondary)',fontSize:13,marginTop:4 }}>Live status, camera feeds and controls for your Bambu Lab printers</p>
+            <p style={{ color:'var(--text-secondary)',fontSize:13,marginTop:4 }}>
+              Live status, camera feeds and controls for your Bambu Lab printers
+            </p>
           </div>
-          <div style={{ display:'flex',gap:8 }}>
-            {isOwner && (
-              <button className="btn btn-secondary" onClick={()=>setShowCloud(true)}>
-                ☁ Bambu Cloud
-              </button>
-            )}
-            {isOwner && (
-              <button className="btn btn-primary" onClick={()=>{setShowAdd(true);setForm(BLANK);setErr('');}}>
-                + Add Printer
-              </button>
-            )}
-          </div>
+          {isOwner && (
+            <div style={{ display:'flex',gap:8 }}>
+              <button className="btn btn-secondary" onClick={()=>setShowCloud(true)}>☁ Bambu Cloud</button>
+              <button className="btn btn-primary" onClick={()=>{ setShowAdd(true); setForm(BLANK); setErr(''); }}>+ Add Printer</button>
+            </div>
+          )}
         </div>
 
+        {/* Printer grid */}
         {loading ? <div style={{ color:'var(--text-secondary)',padding:32 }}>Loading...</div> : (
           <div style={{ display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(320px,1fr))',gap:16,marginBottom:24 }}>
-            {printers.map(p=>{
-              const live = liveStates[p.serial] || {};
+            {printers.map(p => {
+              const live   = liveStates[p.serial] || {};
               const status = live.status || 'offline';
-              const pct = live.print_pct || 0;
+              const pct    = live.print_pct || 0;
               const isActive = ['printing','paused','preparing'].includes(status);
+
               return (
                 <div key={p.id} className="card" style={{ padding:20 }}>
-                  {/* Header */}
+                  {/* Card header */}
                   <div style={{ display:'flex',alignItems:'center',gap:10,marginBottom:14 }}>
                     <StatusDot status={status} />
-                    <div style={{ flex:1 }}>
+                    <div style={{ flex:1,minWidth:0 }}>
                       <div style={{ fontSize:15,fontWeight:700 }}>{p.name}</div>
                       <div style={{ fontSize:12,color:'var(--text-secondary)' }}>{p.model} · {p.serial}</div>
                     </div>
@@ -366,7 +417,8 @@ export default function PrintersPage() {
                       {status}
                     </span>
                     {isOwner && (
-                      <button className="btn btn-ghost btn-icon" style={{ padding:4 }} onClick={()=>openEdit(p)} title="Edit printer settings">
+                      <button className="btn btn-ghost btn-icon" style={{ padding:4,flexShrink:0 }}
+                        onClick={() => openEdit(p)} title="Edit printer settings">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                           <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
                           <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
@@ -383,13 +435,19 @@ export default function PrintersPage() {
                         <span style={{ fontWeight:600,color:'var(--accent)',flexShrink:0 }}>{pct}%</span>
                       </div>
                       <div className="progress"><div className="progress-fill" style={{ width:`${pct}%`,background:'var(--green)' }}/></div>
-                      {live.eta_min>0 && <div style={{ fontSize:11,color:'var(--text-tertiary)',marginTop:4 }}>ETA: ~{Math.round(live.eta_min)} min · Layer {live.layer_num}/{live.total_layer_num}</div>}
+                      {live.eta_min>0 && (
+                        <div style={{ fontSize:11,color:'var(--text-tertiary)',marginTop:4 }}>
+                          ETA: ~{Math.round(live.eta_min)} min · Layer {live.layer_num}/{live.total_layer_num}
+                        </div>
+                      )}
                     </div>
                   )}
 
                   {/* Temperatures */}
                   <div style={{ display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:8,marginBottom:14 }}>
-                    {[['Nozzle',live.nozzle_temp,live.nozzle_target,'var(--red)'],['Bed',live.bed_temp,live.bed_target,'var(--amber)'],['Chamber',live.chamber_temp,null,'var(--blue)']].map(([l,t,tgt,c])=>(
+                    {[['Nozzle',live.nozzle_temp,live.nozzle_target,'var(--red)'],
+                      ['Bed',   live.bed_temp,   live.bed_target,   'var(--amber)'],
+                      ['Chamber',live.chamber_temp,null,            'var(--blue)']].map(([l,t,tgt,c])=>(
                       <div key={l} style={{ padding:'8px 10px',background:'var(--bg-hover)',borderRadius:'var(--r-sm)',textAlign:'center' }}>
                         <div style={{ fontSize:10,color:'var(--text-tertiary)',marginBottom:2 }}>{l}</div>
                         <div style={{ fontSize:14,fontWeight:700,color:t>0?c:'var(--text-tertiary)' }}>{t||0}°C</div>
@@ -403,7 +461,7 @@ export default function PrintersPage() {
                     <div style={{ display:'flex',gap:6,marginBottom:12 }}>
                       {status==='printing' && <button className="btn btn-secondary btn-sm" onClick={()=>sendCommand(p.serial,'pause')}>Pause</button>}
                       {status==='paused'   && <button className="btn btn-primary btn-sm"   onClick={()=>sendCommand(p.serial,'resume')}>Resume</button>}
-                      <button className="btn btn-danger btn-sm" onClick={()=>{if(window.confirm('Stop print?'))sendCommand(p.serial,'stop');}}>Stop</button>
+                      <button className="btn btn-danger btn-sm" onClick={()=>{ if(window.confirm('Stop print?')) sendCommand(p.serial,'stop'); }}>Stop</button>
                     </div>
                   )}
 
@@ -421,10 +479,10 @@ export default function PrintersPage() {
                     </div>
                   )}
 
-                  {/* Camera feed */}
+                  {/* Camera */}
                   <CameraFeed printer={p} token={token} />
 
-                  {/* Footer */}
+                  {/* Footer actions */}
                   {isOwner && (
                     <div style={{ marginTop:10,display:'flex',justifyContent:'space-between',alignItems:'center' }}>
                       <button className="btn btn-ghost btn-sm" style={{ fontSize:11,color:'var(--accent)' }} onClick={()=>openEdit(p)}>
@@ -439,72 +497,79 @@ export default function PrintersPage() {
               );
             })}
 
+            {/* Add printer placeholder */}
             {isOwner && (
-              <div className="card interactive" onClick={()=>{setShowAdd(true);setForm(BLANK);setErr('');}}
+              <div className="card interactive" onClick={()=>{ setShowAdd(true); setForm(BLANK); setErr(''); }}
                 style={{ padding:24,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:10,border:'0.5px dashed var(--border-strong)',background:'transparent',minHeight:200,cursor:'pointer' }}>
-                <svg width="40" height="40" viewBox="0 0 80 80" fill="none" style={{ opacity:0.4 }}>
-                  <rect x="8"  y="12" width="6"  height="40" rx="3" fill="currentColor"/>
-                  <rect x="66" y="12" width="6"  height="40" rx="3" fill="currentColor"/>
-                  <rect x="8"  y="10" width="64" height="8"  rx="4" fill="currentColor"/>
+                <svg width="40" height="40" viewBox="0 0 80 80" fill="none" style={{ opacity:0.35 }}>
+                  <rect x="8" y="12" width="6" height="40" rx="3" fill="currentColor"/>
+                  <rect x="66" y="12" width="6" height="40" rx="3" fill="currentColor"/>
+                  <rect x="8" y="10" width="64" height="8" rx="4" fill="currentColor"/>
                   <rect x="31" y="12" width="18" height="11" rx="3" fill="currentColor"/>
                   <path d="M37 23 L40 30 L43 23 Z" fill="currentColor"/>
-                  <rect x="27" y="46" width="26" height="5"  rx="2" fill="currentColor"/>
-                  <rect x="10" y="57" width="60" height="8"  rx="3" fill="currentColor"/>
+                  <rect x="27" y="46" width="26" height="5" rx="2" fill="currentColor"/>
+                  <rect x="10" y="57" width="60" height="8" rx="3" fill="currentColor"/>
                 </svg>
                 <span style={{ fontSize:13,color:'var(--text-tertiary)',fontWeight:500 }}>Add Printer</span>
               </div>
             )}
             {printers.length===0 && !isOwner && (
-              <div style={{ gridColumn:'1/-1',textAlign:'center',padding:48,color:'var(--text-tertiary)' }}>No printers registered yet.</div>
+              <div style={{ gridColumn:'1/-1',textAlign:'center',padding:48,color:'var(--text-tertiary)' }}>
+                No printers registered yet.
+              </div>
             )}
           </div>
         )}
 
-        {/* Setup help */}
+        {/* Camera setup help */}
         <div className="card" style={{ padding:16 }}>
           <div style={{ fontSize:13,fontWeight:600,marginBottom:10 }}>Camera Setup — Bambu Lab Printers</div>
           <div style={{ display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(200px,1fr))',gap:12,fontSize:12,color:'var(--text-secondary)' }}>
-            <div><strong style={{ color:'var(--text-primary)',display:'block',marginBottom:3 }}>1. Enable LAN Mode Liveview</strong>Printer touchscreen: Settings → Network → LAN Mode Liveview → Enable. Restart the printer.</div>
-            <div><strong style={{ color:'var(--text-primary)',display:'block',marginBottom:3 }}>2. Note the IP Address</strong>Settings → Network → shows the printer's local IP address.</div>
-            <div><strong style={{ color:'var(--text-primary)',display:'block',marginBottom:3 }}>3. Use same Access Code</strong>The camera uses the same LAN access code as MQTT. No separate credentials needed.</div>
-            <div><strong style={{ color:'var(--text-primary)',display:'block',marginBottom:3 }}>4. Click Edit Settings</strong>Use the pencil icon on any printer card to enter camera IP if it differs from the printer IP.</div>
+            <div><strong style={{ color:'var(--text-primary)',display:'block',marginBottom:3 }}>1. Enable LAN Mode Liveview</strong>Printer touchscreen: Settings → Network → LAN Mode Liveview → Enable. Then restart the printer.</div>
+            <div><strong style={{ color:'var(--text-primary)',display:'block',marginBottom:3 }}>2. Note your IP Address</strong>Settings → Network — shows the printer's local IP. It should match what's in PrintFlow.</div>
+            <div><strong style={{ color:'var(--text-primary)',display:'block',marginBottom:3 }}>3. Access Code</strong>Camera uses the same LAN access code as MQTT. No separate credentials needed in most cases.</div>
+            <div><strong style={{ color:'var(--text-primary)',display:'block',marginBottom:3 }}>4. Edit Settings</strong>Click the pencil icon on any printer card to update IP, access code, or camera settings.</div>
           </div>
         </div>
       </div>
 
-      {/* Add Printer Modal */}
+      {/* ── Add Printer Modal ── */}
       {showAdd && (
-        <Modal title="Add Printer" width={520} onClose={()=>setShowAdd(false)}>
-          <PrinterFormFields isEdit={false} />
-          {err && <div style={{ color:'var(--red)',fontSize:12,marginBottom:8,marginTop:8 }}>{err}</div>}
-          <div style={{ display:'flex',gap:8,justifyContent:'flex-end',marginTop:16 }}>
-            <button className="btn btn-secondary" onClick={()=>setShowAdd(false)}>Cancel</button>
-            <button className="btn btn-primary" onClick={addPrinter} disabled={saving||!form.name||!form.serial||!form.ip_address||!form.access_code}>
-              {saving?'Connecting...':'Add Printer'}
+        <Modal title="Add Printer" width={520} onClose={()=>{ setShowAdd(false); setErr(''); }}>
+          <PrinterForm form={form} setForm={setForm} isEdit={false} />
+          {err && <div style={{ color:'var(--red)',fontSize:12,marginTop:12 }}>{err}</div>}
+          <div style={{ display:'flex',gap:8,justifyContent:'flex-end',marginTop:20 }}>
+            <button className="btn btn-secondary" onClick={()=>{ setShowAdd(false); setErr(''); }}>Cancel</button>
+            <button className="btn btn-primary" onClick={addPrinter}
+              disabled={saving||!form.name||!form.serial||!form.ip_address||!form.access_code}>
+              {saving ? 'Connecting...' : 'Add Printer'}
             </button>
           </div>
         </Modal>
       )}
 
-      {/* Edit Printer Modal */}
+      {/* ── Edit Printer Modal ── */}
       {showEdit && editingPrinter && (
-        <Modal title={`Edit — ${editingPrinter.name}`} width={520} onClose={()=>setShowEdit(false)}>
-          <PrinterFormFields isEdit={true} />
-          {err && <div style={{ color:'var(--red)',fontSize:12,marginBottom:8,marginTop:8 }}>{err}</div>}
-          <div style={{ display:'flex',gap:8,justifyContent:'space-between',marginTop:16 }}>
+        <Modal title={`Edit — ${editingPrinter.name}`} width={520} onClose={()=>{ setShowEdit(false); setErr(''); }}>
+          <PrinterForm form={form} setForm={setForm} isEdit={true} />
+          {err && <div style={{ color:'var(--red)',fontSize:12,marginTop:12 }}>{err}</div>}
+          <div style={{ display:'flex',gap:8,justifyContent:'space-between',marginTop:20 }}>
             <button className="btn btn-danger btn-sm" onClick={()=>removePrinter(editingPrinter)}>Remove Printer</button>
             <div style={{ display:'flex',gap:8 }}>
-              <button className="btn btn-secondary" onClick={()=>setShowEdit(false)}>Cancel</button>
-              <button className="btn btn-primary" onClick={savePrinterEdit} disabled={saving||!form.name||!form.ip_address||!form.access_code}>
-                {saving?'Saving...':'Save Changes'}
+              <button className="btn btn-secondary" onClick={()=>{ setShowEdit(false); setErr(''); }}>Cancel</button>
+              <button className="btn btn-primary" onClick={savePrinterEdit}
+                disabled={saving||!form.name||!form.ip_address||!form.access_code}>
+                {saving ? 'Saving...' : 'Save Changes'}
               </button>
             </div>
           </div>
         </Modal>
       )}
 
-      {/* Cloud Login Modal */}
-      {showCloud && <CloudLoginModal onClose={()=>setShowCloud(false)} onSuccess={()=>{ setShowCloud(false); load(); }} />}
+      {/* ── Cloud Login Modal ── */}
+      {showCloud && (
+        <CloudLoginModal onClose={()=>setShowCloud(false)} onSuccess={()=>{ setShowCloud(false); load(); }} />
+      )}
     </div>
   );
 }
