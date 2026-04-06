@@ -3,6 +3,28 @@
 
 export const CHANGELOG = [
   {
+    version: '1.0.8',
+    date: '2026-04-06',
+    title: 'Nav Redesign, Quotes, Print History & Notifications',
+    highlights: [
+      'Redesigned sidebar — clean SVG icons, 4 focused sections, less clutter',
+      'New Quote & Invoice generator — professional PDFs with HST, line items, your branding',
+      'New Print History page — complete log of all print jobs with CSV export',
+      'Push notifications via ntfy.sh — get notified on your phone when prints finish',
+      'CSV export on Orders, Duplicate Order button, keyboard shortcuts',
+    ],
+    changes: [
+      { type: 'new',     text: 'Sidebar redesigned — SVG icons replace emojis, 6 sections consolidated to 4 (Work, Production, Business, System)' },
+      { type: 'new',     text: 'Theme toggle and Check for Updates moved to user footer for cleaner nav' },
+      { type: 'new',     text: 'Quotes & Invoices page — line items, HST calc, business info, fill from customer/order, prints to PDF' },
+      { type: 'new',     text: 'Print History page — full log of all jobs, filter by stage/printer, CSV export' },
+      { type: 'new',     text: 'Push notifications — ntfy.sh integration in Settings, sends alert when job completes or fails' },
+      { type: 'new',     text: 'Orders — CSV export button, Duplicate Order button in edit modal' },
+      { type: 'new',     text: 'Keyboard shortcuts — Cmd+1-5 navigate between main pages' },
+      { type: 'new',     text: 'Server — /api/notifications route for push notification config and delivery' },
+    ],
+  },
+  {
     version: '1.0.6',
     date: '2026-04-05',
     title: 'Job Queue, Customer CRM & Shopify Fix',
