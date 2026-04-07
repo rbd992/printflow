@@ -3,6 +3,35 @@
 
 export const CHANGELOG = [
   {
+    version: '1.1.6',
+    date: '2026-04-07',
+    title: 'Email Sending, Linux Build, GitHub Actions & Polish',
+    highlights: [
+      'Send quotes and invoices directly by email — configure SMTP in Settings',
+      'Linux .AppImage added to the release pipeline',
+      'GitHub Actions updated to Node.js 22 — resolves deprecation warnings',
+      'Tailscale integration updated to OAuth (authkey deprecated)',
+      'Printers page subtitle updated to reflect multi-brand support',
+      'Add Printer no longer requires access code for OctoPrint/Klipper',
+    ],
+    changes: [
+      { type: 'new',     text: 'Quotes — Send by Email button appears when SMTP is configured; sends quote/invoice to customer email' },
+      { type: 'new',     text: 'Quotes — shows a hint to configure SMTP in Settings when email is not yet set up' },
+      { type: 'new',     text: 'Settings — Email / SMTP section (Owner only): configure host, port, username, password, from name' },
+      { type: 'new',     text: 'Settings — Send Test button verifies SMTP config by sending a test email to yourself' },
+      { type: 'new',     text: 'Server — /api/email route: send-quote, test, and config endpoints' },
+      { type: 'new',     text: 'Server — nodemailer added as dependency for SMTP email delivery' },
+      { type: 'new',     text: 'Linux — .AppImage build added to GitHub Actions release workflow (build-linux job)' },
+      { type: 'new',     text: 'Linux — AppImage URL added to NAS update manifest (latest.json)' },
+      { type: 'fix',     text: 'GitHub Actions — all jobs updated from Node.js 20 to Node.js 22 (resolves deprecation warnings)' },
+      { type: 'fix',     text: 'GitHub Actions — upload-artifact updated from v6 to v4 across all jobs' },
+      { type: 'fix',     text: 'GitHub Actions — Tailscale action updated from authkey to OAuth (oauth-client-id + oauth-secret)' },
+      { type: 'fix',     text: 'Printers — page subtitle changed from “Bambu Lab printers” to “all your printers”' },
+      { type: 'fix',     text: 'Printers — Add Printer button no longer requires access code for OctoPrint and Klipper (it is optional for those types)' },
+      { type: 'fix',     text: 'Quotes — hstEnabled state was accidentally dropped in previous session; restored correctly' },
+    ],
+  },
+  {
     version: '1.1.5',
     date: '2026-04-07',
     title: 'Multi-Brand Printer Support — OctoPrint & Klipper/Moonraker',

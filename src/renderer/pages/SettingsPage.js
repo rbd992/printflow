@@ -26,6 +26,11 @@ export default function SettingsPage({ onThemeChange }) {
   const [backupDownloading, setBackupDownloading] = useState(false);
   const [restoreStatus, setRestoreStatus] = useState('');
   const restoreFileRef = useRef(null);
+  const [emailCfg, setEmailCfg]       = useState({ host:'', port:'587', user:'', pass:'', from_name:'', secure:false });
+  const [emailSaved, setEmailSaved]   = useState(false);
+  const [emailSaving, setEmailSaving] = useState(false);
+  const [emailTesting, setEmailTesting] = useState(false);
+  const [emailTestMsg, setEmailTestMsg] = useState('');
 
   useEffect(() => {
     window.printflow.getTheme().then(t => setThemeLocal(t || 'dark'));
@@ -33,6 +38,9 @@ export default function SettingsPage({ onThemeChange }) {
     settingsApi.get('ntfy_config').then(r => { if (r.data?.value) setNtfy(r.data.value); }).catch(() => {});
     settingsApi.get('company_config').then(r => { if (r.data?.value) setCompany(c => ({ ...c, ...r.data.value })); }).catch(() => {});
     api.get('/api/backup/info').then(r => setBackupInfo(r.data)).catch(() => {});
+    api.get('/api/email/config').then(r => {
+      if (r.data?.configured) setEmailCfg(c => ({ ...c, ...r.data }));
+    }).catch(() => {});
   }, [serverUrl]);
 
   async function changeTheme(t) { setThemeLocal(t); onThemeChange(t); await window.printflow.setTheme(t); }
@@ -109,6 +117,27 @@ export default function SettingsPage({ onThemeChange }) {
   const FC = k => ({ value: company[k] ?? '', onChange: e => setCompany(c => ({ ...c, [k]: e.target.value })) });
   const PROVINCES    = ['AB','BC','MB','NB','NL','NS','NT','NU','ON','PE','QC','SK','YT'];
   const MONTHS_LABEL = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+
+  async function saveEmail() {
+    setEmailSaving(true); setEmailTestMsg('');
+    try {
+      await api.post('/api/settings', { key: 'email_config', value: emailCfg });
+      setEmailSaved(true); setTimeout(() => setEmailSaved(false), 2000);
+    } catch (e) { setEmailTestMsg('Save failed: ' + (e.response?.data?.error || e.message)); }
+    finally { setEmailSaving(false); }
+  }
+
+  async function testEmail() {
+    setEmailTesting(true); setEmailTestMsg('');
+    try {
+      await saveEmail();
+      await api.post('/api/email/test');
+      setEmailTestMsg('Test email sent! Check your inbox.');
+    } catch (e) { setEmailTestMsg('Test failed: ' + (e.response?.data?.error || e.message)); }
+    finally { setEmailTesting(false); }
+  }
+
+  const EF = k => ({ value: emailCfg[k] ?? '', onChange: e => setEmailCfg(c => ({ ...c, [k]: e.target.value })) });
 
   return (
     <div style={{ height:'100%', overflowY:'auto', padding:24 }}>
@@ -264,7 +293,64 @@ export default function SettingsPage({ onThemeChange }) {
           </div>
         </div>
 
-        {/* ── Integrations ──────────────────────────────────────────── */}
+        {/* Email / SMTP */}
+        {user?.role === 'owner' && (
+          <div className="card" style={{ padding:20, marginBottom:14 }}>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:6 }}>
+              <h3>Email / SMTP</h3>
+              <div style={{ display:'flex', gap:8 }}>
+                <button className="btn btn-secondary btn-sm" onClick={testEmail} disabled={emailTesting||!emailCfg.host||!emailCfg.user||!emailCfg.pass}>
+                  {emailTesting ? 'Sending...' : 'Send Test'}
+                </button>
+                <button className="btn btn-primary btn-sm" onClick={saveEmail} disabled={emailSaving}>
+                  {emailSaved ? '\u2713 Saved' : emailSaving ? 'Saving\u2026' : 'Save'}
+                </button>
+              </div>
+            </div>
+            <p style={{ fontSize:12, color:'var(--text-secondary)', marginBottom:14, lineHeight:1.6 }}>
+              Configure SMTP to send quotes and invoices directly to customers by email.
+              Works with Gmail, Outlook, or any SMTP provider.
+            </p>
+            <div className="form-row">
+              <div className="form-group" style={{ flex:2 }}>
+                <label className="label">SMTP Host</label>
+                <input className="input" {...EF('host')} placeholder="smtp.gmail.com" style={{ fontFamily:'monospace' }}/>
+              </div>
+              <div className="form-group" style={{ flex:1 }}>
+                <label className="label">Port</label>
+                <input className="input" {...EF('port')} placeholder="587" style={{ fontFamily:'monospace' }}/>
+              </div>
+            </div>
+            <div className="form-row">
+              <div className="form-group">
+                <label className="label">Username / Email</label>
+                <input className="input" type="email" {...EF('user')} placeholder="you@gmail.com"/>
+              </div>
+              <div className="form-group">
+                <label className="label">Password / App Password</label>
+                <input className="input" type="password" {...EF('pass')} placeholder="\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022"/>
+              </div>
+            </div>
+            <div className="form-group">
+              <label className="label">From Name (shown to recipients)</label>
+              <input className="input" {...EF('from_name')} placeholder="Alliston 3D Prints"/>
+            </div>
+            {emailTestMsg && (
+              <div style={{ marginTop:8, padding:'8px 12px', borderRadius:8, fontSize:12,
+                background: emailTestMsg.includes('ailed') ? 'var(--red-light)' : 'var(--green-light)',
+                color: emailTestMsg.includes('ailed') ? 'var(--red)' : 'var(--green)',
+              }}>
+                {emailTestMsg}
+              </div>
+            )}
+            <div style={{ marginTop:12, padding:'10px 12px', background:'var(--bg-hover)', borderRadius:8, fontSize:12, color:'var(--text-secondary)', lineHeight:1.6 }}>
+              <strong>Gmail:</strong> Use an App Password — enable 2FA then Google Account &rarr; Security &rarr; App Passwords.<br/>
+              <strong>Outlook:</strong> Host: <code>smtp.office365.com</code>, Port: 587.
+            </div>
+          </div>
+        )}
+
+        {/* Integrations */}
         <div className="card" style={{ padding:20, marginBottom:14 }}>
           <h3 style={{ marginBottom:6 }}>Integrations</h3>
           <p style={{ fontSize:12, color:'var(--text-secondary)', marginBottom:14, lineHeight:1.6 }}>Connect PrintFlow to external platforms and services.</p>

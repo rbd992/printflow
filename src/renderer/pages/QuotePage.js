@@ -11,29 +11,32 @@ function formatDate(d) {
 }
 
 const BLANK_LINE = { description: '', qty: 1, unit_price: '', hst: true };
-
-const PROVINCES = ['AB','BC','MB','NB','NL','NS','NT','NU','ON','PE','QC','SK','YT'];
+const PROVINCES  = ['AB','BC','MB','NB','NL','NS','NT','NU','ON','PE','QC','SK','YT'];
 
 export default function QuotePage() {
   const { user } = useAuthStore();
-  const [docType,    setDocType]   = useState('quote');
-  const [customers,  setCustomers] = useState([]);
-  const [orders,     setOrders]    = useState([]);
-  const [docNum,     setDocNum]    = useState('');
-  const [docDate,    setDocDate]   = useState(new Date().toISOString().slice(0, 10));
-  const [dueDate,    setDueDate]   = useState('');
-  const [customer,   setCustomer]  = useState({ name: '', email: '', address: '', city: '', province: 'ON', postal: '' });
-  const [lines,      setLines]     = useState([{ ...BLANK_LINE }]);
-  const [notes,      setNotes]     = useState('Thank you for your business!');
+  const [docType,     setDocType]    = useState('quote');
+  const [customers,   setCustomers]  = useState([]);
+  const [orders,      setOrders]     = useState([]);
+  const [docNum,      setDocNum]     = useState('');
+  const [docDate,     setDocDate]    = useState(new Date().toISOString().slice(0, 10));
+  const [dueDate,     setDueDate]    = useState('');
+  const [customer,    setCustomer]   = useState({ name: '', email: '', address: '', city: '', province: 'ON', postal: '' });
+  const [lines,       setLines]      = useState([{ ...BLANK_LINE }]);
+  const [notes,       setNotes]      = useState('Thank you for your business!');
   const [linkedOrder, setLinkedOrder] = useState('');
 
   // Company config — loaded from server, populated by onboarding/settings
-  const [biz, setBiz] = useState(null); // null = loading
-  const [hstRate, setHstRate]     = useState(13);
+  const [biz,        setBiz]        = useState(null); // null = loading
+  const [hstRate,    setHstRate]    = useState(13);
   const [hstEnabled, setHstEnabled] = useState(true);
 
+  // Email state
+  const [sendingEmail, setSendingEmail] = useState(false);
+  const [emailStatus,  setEmailStatus]  = useState('');
+  const [emailConfigured, setEmailConfigured] = useState(false);
+
   useEffect(() => {
-    // Load company config saved by onboarding / Settings page
     settingsApi.get('company_config')
       .then(r => {
         if (r.data?.value) {
@@ -55,9 +58,9 @@ export default function QuotePage() {
 
     api.get('/api/customers').then(r => setCustomers(r.data || [])).catch(() => {});
     api.get('/api/orders?historical=all&limit=200').then(r => setOrders(r.data || [])).catch(() => {});
+    api.get('/api/email/config').then(r => setEmailConfigured(!!r.data?.configured)).catch(() => {});
   }, []);
 
-  // Auto-generate doc number when docType changes
   useEffect(() => {
     const prefix = docType === 'quote' ? 'Q' : 'INV';
     const num = String(Math.floor(Date.now() / 1000) % 100000).padStart(5, '0');
@@ -81,10 +84,9 @@ export default function QuotePage() {
     setLines(prev => prev.map((l, idx) => idx === i ? { ...l, [k]: v } : l));
   }
 
-  function addLine() { setLines(prev => [...prev, { ...BLANK_LINE, hst: hstEnabled }]); }
-  function removeLine(i) { setLines(prev => prev.filter((_, idx) => idx !== i)); }
+  function addLine()      { setLines(prev => [...prev, { ...BLANK_LINE, hst: hstEnabled }]); }
+  function removeLine(i)  { setLines(prev => prev.filter((_, idx) => idx !== i)); }
 
-  // Calculations — use live hstRate from company config
   const subtotal  = lines.reduce((a, l) => a + (parseFloat(l.unit_price) || 0) * (parseFloat(l.qty) || 1), 0);
   const hstAmount = hstEnabled
     ? lines.reduce((a, l) => l.hst ? a + (parseFloat(l.unit_price) || 0) * (parseFloat(l.qty) || 1) * (hstRate / 100) : a, 0)
@@ -101,6 +103,31 @@ export default function QuotePage() {
     setTimeout(() => win.print(), 500);
   }
 
+  async function sendByEmail() {
+    if (!customer.email) { setEmailStatus('Add the customer email address first.'); return; }
+    setSendingEmail(true);
+    setEmailStatus('');
+    try {
+      // Build the HTML document
+      const html = buildHTML({ docType, docNum, docDate, dueDate, customer, lines, notes, biz, subtotal, hstAmount, total, hstRate, hstEnabled });
+      const docLabel = docType === 'quote' ? 'Quote' : 'Invoice';
+      const subject  = `${docLabel} ${docNum} from ${biz?.name || 'PrintFlow'}`;
+
+      await api.post('/api/email/send-quote', {
+        to:        customer.email,
+        subject,
+        html:      `<p>Hi ${customer.name || 'there'},</p><p>Please find your ${docLabel.toLowerCase()} attached.</p><p>Thank you for your business!</p>`,
+        from_name: biz?.name || 'PrintFlow',
+      });
+
+      setEmailStatus(`Sent to ${customer.email}`);
+      setTimeout(() => setEmailStatus(''), 4000);
+    } catch (e) {
+      setEmailStatus('Failed: ' + (e.response?.data?.error || e.message));
+    }
+    setSendingEmail(false);
+  }
+
   const loading = biz === null;
 
   return (
@@ -114,12 +141,31 @@ export default function QuotePage() {
               Generate professional quotes and invoices as PDFs
             </p>
           </div>
-          <button className="btn btn-primary" onClick={generateAndPrint} disabled={loading}>
-            Print / Save PDF
-          </button>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            {emailConfigured && (
+              <button className="btn btn-secondary" onClick={sendByEmail}
+                disabled={loading || sendingEmail || !customer.email}>
+                {sendingEmail ? 'Sending…' : 'Send by Email'}
+              </button>
+            )}
+            <button className="btn btn-primary" onClick={generateAndPrint} disabled={loading}>
+              Print / Save PDF
+            </button>
+          </div>
         </div>
 
-        {/* Company info banner — read-only, pulled from Settings */}
+        {/* Email status */}
+        {emailStatus && (
+          <div style={{ marginBottom: 12, padding: '10px 14px', borderRadius: 8, fontSize: 13,
+            background: emailStatus.startsWith('Failed') ? 'var(--red-light)' : 'var(--green-light)',
+            color: emailStatus.startsWith('Failed') ? 'var(--red)' : 'var(--green)',
+            border: `0.5px solid ${emailStatus.startsWith('Failed') ? 'var(--red)' : 'var(--green)'}`,
+          }}>
+            {emailStatus.startsWith('Failed') ? emailStatus : `Sent to ${customer.email}`}
+          </div>
+        )}
+
+        {/* Company info banner */}
         {biz && (
           <div style={{ marginBottom: 16, padding: '12px 16px', background: 'var(--bg-hover)', borderRadius: 8, border: '0.5px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div>
@@ -135,6 +181,17 @@ export default function QuotePage() {
             <a href="#/settings" style={{ fontSize: 12, color: 'var(--accent)', textDecoration: 'none', flexShrink: 0, marginLeft: 16 }}
               onClick={e => { e.preventDefault(); window.location.hash = '/settings'; }}>
               Edit in Settings →
+            </a>
+          </div>
+        )}
+
+        {/* Email not configured notice */}
+        {!emailConfigured && !loading && (
+          <div style={{ marginBottom: 14, padding: '10px 14px', background: 'var(--bg-hover)', borderRadius: 8, fontSize: 12, color: 'var(--text-secondary)', border: '0.5px solid var(--border)' }}>
+            To send quotes by email, configure SMTP in{' '}
+            <a href="#/settings" style={{ color: 'var(--accent)', textDecoration: 'none' }}
+              onClick={e => { e.preventDefault(); window.location.hash = '/settings'; }}>
+              Settings → Email / SMTP
             </a>
           </div>
         )}
@@ -222,7 +279,7 @@ export default function QuotePage() {
           <div className="card" style={{ padding: 18 }}>
             <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 12 }}>Line Items</div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 60px 110px 60px 28px', gap: 6, marginBottom: 8 }}>
-              {['Description', 'Qty', 'Unit Price', hstEnabled ? `Tax` : '', ''].map((h, i) => (
+              {['Description', 'Qty', 'Unit Price', hstEnabled ? 'Tax' : '', ''].map((h, i) => (
                 <div key={i} style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-tertiary)' }}>{h}</div>
               ))}
             </div>
@@ -241,7 +298,6 @@ export default function QuotePage() {
             ))}
             <button className="btn btn-ghost btn-sm" onClick={addLine} style={{ marginTop: 6 }}>+ Add Line</button>
 
-            {/* Totals */}
             <div style={{ marginTop: 16, paddingTop: 14, borderTop: '0.5px solid var(--border)', maxWidth: 280, marginLeft: 'auto' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '4px 0', color: 'var(--text-secondary)' }}>
                 <span>Subtotal</span><span>{formatCAD(subtotal)}</span>
@@ -263,11 +319,19 @@ export default function QuotePage() {
             <textarea className="input" rows={3} value={notes} onChange={e => setNotes(e.target.value)} />
           </div>
 
-          {/* Generate button */}
-          <button className="btn btn-primary" style={{ justifyContent: 'center', height: 44, fontSize: 14 }}
-            onClick={generateAndPrint} disabled={loading}>
-            Print / Save PDF
-          </button>
+          {/* Action buttons */}
+          <div style={{ display: 'flex', gap: 10 }}>
+            {emailConfigured && (
+              <button className="btn btn-secondary" style={{ flex: 1, justifyContent: 'center', height: 44, fontSize: 14 }}
+                onClick={sendByEmail} disabled={loading || sendingEmail || !customer.email}>
+                {sendingEmail ? 'Sending…' : 'Send by Email'}
+              </button>
+            )}
+            <button className="btn btn-primary" style={{ flex: 2, justifyContent: 'center', height: 44, fontSize: 14 }}
+              onClick={generateAndPrint} disabled={loading}>
+              Print / Save PDF
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -284,7 +348,6 @@ function buildHTML({ docType, docNum, docDate, dueDate, customer, lines, notes, 
     const qty = parseFloat(l.qty) || 1;
     const price = parseFloat(l.unit_price) || 0;
     const lineTotal = qty * price;
-    const lineTax = (hstEnabled && l.hst) ? lineTotal * (hstRate / 100) : 0;
     return `
       <tr>
         <td>${l.description}</td>

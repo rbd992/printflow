@@ -577,7 +577,7 @@ export default function PrintersPage() {
           <div>
             <h1>Printers</h1>
             <p style={{ color:'var(--text-secondary)',fontSize:13,marginTop:4 }}>
-              Live status, camera feeds and controls for your Bambu Lab printers
+              Live status, camera feeds and controls for all your printers
             </p>
           </div>
           {isOwner && (
@@ -743,7 +743,7 @@ export default function PrintersPage() {
           <div style={{ display:'flex',gap:8,justifyContent:'flex-end',marginTop:20 }}>
             <button className="btn btn-secondary" onClick={()=>{ setShowAdd(false); setErr(''); }}>Cancel</button>
             <button className="btn btn-primary" onClick={addPrinter}
-              disabled={saving||!form.name||!form.serial||!form.ip_address||!form.access_code}>
+              disabled={saving||!form.name||!form.serial||!form.ip_address||(form.connection_type?.startsWith('bambu')&&!form.access_code)}>
               {saving ? 'Connecting...' : 'Add Printer'}
             </button>
           </div>
