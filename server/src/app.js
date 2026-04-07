@@ -167,6 +167,10 @@ fetch(src).then(function(r){
 // ── Customer order tracking portal ────────────────────────────
 // Public page — no auth. Customers visit /track or /track?order=1001
 app.get('/track', (req, res) => {
+  // Override helmet CSP for this page so fetch() to same origin works
+  res.setHeader('Content-Security-Policy',
+    "default-src 'self'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self'"
+  );
   const db = getDb();
   let biz = { name: 'PrintFlow', email: '', phone: '' };
   try {
