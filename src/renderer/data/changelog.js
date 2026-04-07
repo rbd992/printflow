@@ -3,6 +3,20 @@
 
 export const CHANGELOG = [
   {
+    version: '1.1.7',
+    date: '2026-04-07',
+    title: 'Linux AppImage Fix & Tailscale Authkey Rollback',
+    highlights: [
+      'Linux .AppImage build now works correctly',
+      'Tailscale reverted to authkey while OAuth is resolved',
+    ],
+    changes: [
+      { type: 'fix', text: 'Linux — explicitly target AppImage only in both package.json and release workflow, preventing snap builder from running and crashing on .icns icon' },
+      { type: 'fix', text: 'Linux — added artifactName to linux config to ensure consistent output filename' },
+      { type: 'fix', text: 'CI — release.yml and build-docker.yml both reverted to TAILSCALE_AUTHKEY while OAuth 403 permissions issue is investigated' },
+    ],
+  },
+  {
     version: '1.1.6',
     date: '2026-04-07',
     title: 'Email Sending, Linux Build, GitHub Actions & Polish',
