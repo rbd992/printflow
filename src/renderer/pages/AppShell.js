@@ -98,6 +98,13 @@ const Icons = {
       <polyline points="2 12 12 17 22 12"/>
     </svg>
   ),
+  help: (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="10"/>
+      <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>
+      <line x1="12" y1="17" x2="12.01" y2="17"/>
+    </svg>
+  ),
   settings: (
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
       <circle cx="12" cy="12" r="3"/>
@@ -337,7 +344,7 @@ export default function AppShell({ theme, onThemeChange }) {
           </div>
           <div>
             <div style={{ fontSize: 13, fontWeight: 700, letterSpacing: '-0.01em', lineHeight: 1.2 }}>PrintFlow</div>
-            <div style={{ fontSize: 10, color: 'var(--text-tertiary)', textTransform: 'capitalize', lineHeight: 1.4 }}>v1.0.33 · {role}</div>
+            <div style={{ fontSize: 10, color: 'var(--text-tertiary)', textTransform: 'capitalize', lineHeight: 1.4 }}>v1.0.34 · {role}</div>
           </div>
         </div>
 
@@ -372,6 +379,7 @@ export default function AppShell({ theme, onThemeChange }) {
 
           <NavSection label="System">
             <NavItem to="/settings" icon={Icons.settings} label="Settings" userRole={role} />
+            <NavItem to="/help"     icon={Icons.help}     label="Help & Support" userRole={role} />
             <NavItem to="/users"    icon={Icons.users}    label="Users"    minRole="owner" userRole={role} />
           </NavSection>
         </nav>

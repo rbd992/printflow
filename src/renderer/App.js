@@ -26,6 +26,7 @@ import JobQueuePage     from './pages/JobQueuePage';
 import CustomersPage    from './pages/CustomersPage';
 import QuotePage        from './pages/QuotePage';
 import PrintHistoryPage from './pages/PrintHistoryPage';
+import HelpPage          from './pages/HelpPage';
 
 function AuthGuard({ children, roles }) {
   const { token, user } = useAuthStore();
@@ -96,6 +97,7 @@ export default function App() {
           <Route path="users"     element={<AuthGuard roles={['owner']}><UsersPage /></AuthGuard>} />
           <Route path="changelog" element={<ChangelogPage />} />
           <Route path="settings"  element={<SettingsPage onThemeChange={setTheme} />} />
+          <Route path="help"      element={<HelpPage />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

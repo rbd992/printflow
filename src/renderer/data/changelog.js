@@ -3,6 +3,30 @@
 
 export const CHANGELOG = [
   {
+    version: '1.0.34',
+    date: '2026-04-07',
+    title: 'Help & Support Center',
+    highlights: [
+      'Full in-app help and user guide accessible from the sidebar',
+      'Searchable topics covering every feature in PrintFlow',
+      'Troubleshooting guides for common issues',
+    ],
+    changes: [
+      { type: 'new', text: 'Help & Support page — accessible from System section of sidebar' },
+      { type: 'new', text: 'Getting Started guide — app overview, user roles, navigation' },
+      { type: 'new', text: 'Orders guide — creating orders, status pipeline, historical imports, backdating, viewing completed orders' },
+      { type: 'new', text: 'Finance guide — how revenue is tracked, report views, HST settings, manual transactions' },
+      { type: 'new', text: 'Printers guide — live dashboard, camera feed, adding and editing printers' },
+      { type: 'new', text: 'Filament guide — adding spools, price calculator usage' },
+      { type: 'new', text: 'Customers guide — profiles, contact details, order history' },
+      { type: 'new', text: 'Quotes & Invoices guide — creating and printing PDF documents' },
+      { type: 'new', text: 'Settings guide — company config, notifications, server connection, updates' },
+      { type: 'new', text: 'Troubleshooting — can\'t connect, orders not in finance, camera issues, printer offline, getting help' },
+      { type: 'new', text: 'Full-text search across all help topics' },
+      { type: 'new', text: 'Previous / Next navigation between topics' },
+    ],
+  },
+  {
     version: '1.0.33',
     date: '2026-04-07',
     title: 'Orders & Customer Fix — Requires App Rebuild',
