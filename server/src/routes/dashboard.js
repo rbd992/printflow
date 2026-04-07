@@ -6,14 +6,12 @@ const { authenticate } = require('../middleware/auth');
 router.get('/', authenticate, (req, res) => {
   const db = getDb();
 
-  // Revenue = only paid (delivered) non-historical orders this month
+  // Revenue MTD = all income transactions this month (historical orders count as real revenue)
   const revenue_mtd = db.prepare(`
     SELECT COALESCE(SUM(amount_cad), 0) as total
     FROM transactions t
-    LEFT JOIN orders o ON t.order_id = o.id
     WHERE t.type = 'income'
       AND strftime('%Y-%m', t.date) = strftime('%Y-%m', 'now')
-      AND (o.id IS NULL OR o.is_historical = 0)
   `).get().total;
 
   const expenses_mtd = db.prepare(`
@@ -22,16 +20,16 @@ router.get('/', authenticate, (req, res) => {
     WHERE type = 'expense' AND strftime('%Y-%m', date) = strftime('%Y-%m', 'now')
   `).get().total;
 
-  // Active orders exclude historical ones
+  // Active orders = live orders not yet paid or cancelled
   const active_orders = db.prepare(`
     SELECT COUNT(*) as n FROM orders
-    WHERE status NOT IN ('delivered','cancelled') AND is_historical = 0
+    WHERE status NOT IN ('delivered','paid','cancelled') AND is_historical = 0
   `).get().n;
 
   const orders_due_today = db.prepare(`
     SELECT COUNT(*) as n FROM orders
     WHERE due_date = date('now')
-      AND status NOT IN ('delivered','cancelled','shipped')
+      AND status NOT IN ('delivered','paid','cancelled','shipped')
       AND is_historical = 0
   `).get().n;
 
@@ -59,10 +57,8 @@ router.get('/', authenticate, (req, res) => {
   const weekly_revenue = db.prepare(`
     SELECT t.date, SUM(t.amount_cad) as total
     FROM transactions t
-    LEFT JOIN orders o ON t.order_id = o.id
     WHERE t.type = 'income'
       AND t.date >= date('now', '-6 days')
-      AND (o.id IS NULL OR o.is_historical = 0)
     GROUP BY t.date ORDER BY t.date
   `).all();
 

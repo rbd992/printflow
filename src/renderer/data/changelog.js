@@ -3,6 +3,42 @@
 
 export const CHANGELOG = [
   {
+    version: '1.0.32',
+    date: '2026-04-07',
+    title: 'Customer Order History Fix, Orders Filter & Dashboard Revenue Fix',
+    highlights: [
+      'Customers page now shows all orders including historical ones',
+      'Orders page defaults to active orders only — completed toggle works correctly',
+      'Dashboard revenue and active order counts now accurate for all order types',
+    ],
+    changes: [
+      { type: 'fix', text: 'Customers — historical orders now included in customer order history and total spent (was fetching without ?historical=all)' },
+      { type: 'fix', text: 'Orders — filter logic corrected: completed orders hidden by default, status filter still works independently' },
+      { type: 'fix', text: 'Dashboard — revenue MTD now includes historical order transactions (they are real revenue)' },
+      { type: 'fix', text: 'Dashboard — active order count now excludes paid status (was only excluding delivered and cancelled)' },
+      { type: 'fix', text: 'Dashboard — weekly revenue chart no longer excludes historical order transactions' },
+      { type: 'fix', text: 'Dashboard — orders due today now correctly excludes paid orders' },
+    ],
+  },
+  {
+    version: '1.0.31',
+    date: '2026-04-07',
+    title: 'Completed Orders Toggle, HST Fix & Missing Transaction Repair',
+    highlights: [
+      'Orders page now has a Show Completed toggle — paid and cancelled orders hidden by default',
+      'HST now respects company settings — disabled HST means $0 on all new transactions',
+      'Server reads HST rate and enabled flag from company config on every transaction',
+    ],
+    changes: [
+      { type: 'new',     text: 'Orders — Show Completed toggle in filter bar; paid/cancelled orders hidden by default, shown on demand' },
+      { type: 'new',     text: 'Orders — Header now shows active count and completed count separately' },
+      { type: 'new',     text: 'Orders — All orders (including historical) now loaded in one call using ?historical=all' },
+      { type: 'fix',     text: 'HST — transaction hst_amount now reads company_config enable_hst and hst_rate from settings; respects HST off toggle' },
+      { type: 'fix',     text: 'HST — applies to both POST (new order) and PATCH (marking paid) transaction creation' },
+      { type: 'fix',     text: 'Orders — existing transaction HST fixed via REPL for orders created before company settings were saved' },
+    ],
+  },
+  {
     version: '1.0.30',
     date: '2026-04-07',
     title: 'Order Status Sync, Finance Reporting & Company Settings',

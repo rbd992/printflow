@@ -48,7 +48,7 @@ export default function CustomersPage() {
     try {
       const [c, o] = await Promise.all([
         api.get('/api/customers'),
-        ordersApi.list(),
+        ordersApi.list({ historical: 'all' }),
       ]);
       setCustomers(c.data || []);
       setOrders(o.data || []);

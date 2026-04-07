@@ -153,6 +153,7 @@ export default function OrdersPage() {
   const [orders,   setOrders]   = useState([]);
   const [spools,   setSpools]   = useState([]);
   const [loading,  setLoading]  = useState(true);
+  const [showCompleted, setShowCompleted] = useState(false);
   const [filter,   setFilter]   = useState({ status:'',search:'',platform:'' });
   const [editing,  setEditing]  = useState(null);
   const [showCalc, setShowCalc] = useState(false);
@@ -166,7 +167,7 @@ export default function OrdersPage() {
   const load = useCallback(async () => {
     try {
       const [o, s] = await Promise.all([
-        ordersApi.list(),
+        ordersApi.list({ historical: 'all' }),
         filamentApi.list().catch(()=>({data:[]})),
       ]);
       setOrders(o.data);
@@ -183,12 +184,20 @@ export default function OrdersPage() {
     return () => { u1(); u2(); u3(); };
   }, [load]);
 
+  const COMPLETED = ['paid','cancelled'];
+
   const filtered = orders.filter(o => {
+    // Hide completed unless toggle is on OR status filter explicitly targets them
+    const isCompleted = COMPLETED.includes(o.status);
+    if (isCompleted && !showCompleted && !filter.status) return false;
     if (filter.status   && o.status   !== filter.status)   return false;
     if (filter.platform && o.platform !== filter.platform)  return false;
     if (filter.search   && !`${o.order_number} ${o.customer_name} ${o.description||''}`.toLowerCase().includes(filter.search.toLowerCase())) return false;
     return true;
   });
+
+  const activeOrders    = orders.filter(o => !COMPLETED.includes(o.status));
+  const completedOrders = orders.filter(o => COMPLETED.includes(o.status));
 
   const platforms = [...new Set(orders.map(o=>o.platform).filter(Boolean))];
 
@@ -332,7 +341,9 @@ export default function OrdersPage() {
         <div style={{ display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:20 }}>
           <div>
             <h1>Orders</h1>
-            <p style={{ color:'var(--text-secondary)',fontSize:13,marginTop:4 }}>{orders.length} orders · ${revenue.toFixed(2)} total</p>
+            <p style={{ color:'var(--text-secondary)',fontSize:13,marginTop:4 }}>
+              {activeOrders.length} active · {completedOrders.length} completed
+            </p>
           </div>
           <div style={{ display:'flex',gap:8 }}>
             {canManage && <button className="btn btn-primary" onClick={openNew}>+ New Order</button>}
@@ -356,7 +367,7 @@ export default function OrdersPage() {
         </div>
 
         {/* Filters */}
-        <div style={{ display:'flex',gap:10,marginBottom:16,flexWrap:'wrap' }}>
+        <div style={{ display:'flex',gap:10,marginBottom:16,flexWrap:'wrap',alignItems:'center' }}>
           <input className="input" placeholder="Search orders..." style={{ width:220 }}
             value={filter.search} onChange={e=>setFilter(f=>({...f,search:e.target.value}))} />
           <select className="select" style={{ width:160 }} value={filter.status} onChange={e=>setFilter(f=>({...f,status:e.target.value}))}>
@@ -372,6 +383,14 @@ export default function OrdersPage() {
           {(filter.search||filter.status||filter.platform) && (
             <button className="btn btn-secondary btn-sm" onClick={()=>setFilter({status:'',search:'',platform:''})}>Clear</button>
           )}
+          {/* Completed toggle — right-aligned */}
+          <div style={{ marginLeft:'auto',display:'flex',alignItems:'center',gap:8,padding:'6px 12px',background:showCompleted?'var(--accent-light)':'var(--bg-hover)',borderRadius:8,border:`0.5px solid ${showCompleted?'var(--accent)':'var(--border)'}`,cursor:'pointer' }}
+            onClick={()=>setShowCompleted(v=>!v)}>
+            <input type="checkbox" checked={showCompleted} onChange={()=>{}} style={{ width:14,height:14,pointerEvents:'none' }}/>
+            <span style={{ fontSize:13,fontWeight:500,color:showCompleted?'var(--accent)':'var(--text-secondary)',userSelect:'none' }}>
+              Show completed ({completedOrders.length})
+            </span>
+          </div>
         </div>
 
         {/* Table */}

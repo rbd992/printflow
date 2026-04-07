@@ -5,6 +5,26 @@ const { audit } = require('../db/audit');
 const { authenticate, authorize } = require('../middleware/auth');
 const { broadcast } = require('../services/socket');
 
+const VALID_STATUSES = ['new','queued','quoted','confirmed','printing','printed',
+  'post-processing','qc','packed','shipped','delivered','paid','cancelled'];
+
+// Read company HST config from app_settings — returns { enabled, rate }
+function getHstConfig(db) {
+  try {
+    const row = db.prepare("SELECT value FROM app_settings WHERE key = 'company_config'").get();
+    if (row) {
+      const cfg = JSON.parse(row.value);
+      return { enabled: cfg.enable_hst !== false, rate: parseFloat(cfg.hst_rate) || 13 };
+    }
+  } catch {}
+  return { enabled: true, rate: 13 }; // safe default
+}
+
+function calcHst(amount, hst) {
+  if (!hst.enabled) return 0;
+  return parseFloat((amount * hst.rate / 100).toFixed(2));
+}
+
 // GET /api/orders
 router.get('/', authenticate, (req, res) => {
   const db = getDb();
@@ -17,9 +37,8 @@ router.get('/', authenticate, (req, res) => {
   const params = [];
   if (status)   { sql += ' AND o.status = ?';   params.push(status); }
   if (platform) { sql += ' AND o.platform = ?'; params.push(platform); }
-  // Default: exclude historical. ?historical=true = only historical. ?historical=all = everything.
   if (historical === 'true')  { sql += ' AND o.is_historical = 1'; }
-  else if (historical === 'all') { /* no filter */ }
+  else if (historical === 'all') { /* no filter — return everything */ }
   else                           { sql += ' AND o.is_historical = 0'; }
   sql += ' ORDER BY o.created_at DESC LIMIT ? OFFSET ?';
   params.push(parseInt(limit), parseInt(offset));
@@ -55,11 +74,9 @@ router.post('/', authenticate, authorize('owner', 'manager'),
       customer_name, customer_email, platform, description,
       filament_id, price_cad, shipping_cad, due_date, notes,
       is_historical, historical_date, payment_method,
-      order_date,   // optional backdated order date (any order type)
-      paid_date,    // optional backdated paid/delivery date (any order type)
+      order_date, paid_date,
     } = req.body;
 
-    // Generate order number
     const count = db.prepare('SELECT COUNT(*) as n FROM orders').get().n;
     const order_number = `#${String(count + 1001).padStart(4, '0')}`;
 
@@ -72,17 +89,13 @@ router.post('/', authenticate, authorize('owner', 'manager'),
         ? new Date(hist_date).toISOString()
         : new Date().toISOString();
 
-    // Respect the status sent from the client — validate it
-    const VALID_STATUSES = ['new','queued','quoted','confirmed','printing','printed',
-      'post-processing','qc','packed','shipped','delivered','paid','cancelled'];
-    const sentStatus = req.body.status;
-    const resolvedStatus = VALID_STATUSES.includes(sentStatus)
-      ? sentStatus
+    // Respect status from client; default to paid for historical, new for live
+    const resolvedStatus = VALID_STATUSES.includes(req.body.status)
+      ? req.body.status
       : isHist ? 'paid' : 'new';
 
-    // Set paid_at if order is being created as paid/delivered
-    const isPaid = ['paid','delivered'].includes(resolvedStatus);
-    const paid_at_val = isPaid || isHist
+    const isPaidOnCreate = ['paid','delivered'].includes(resolvedStatus);
+    const paid_at_val = (isPaidOnCreate || isHist)
       ? (paid_date || hist_date || order_date || new Date().toISOString().split('T')[0])
       : (paid_date || null);
 
@@ -102,8 +115,9 @@ router.post('/', authenticate, authorize('owner', 'manager'),
 
     const order = db.prepare('SELECT * FROM orders WHERE id = ?').get(result.lastInsertRowid);
 
-    // Create income transaction if order is created as paid/delivered or is historical
-    if (isPaid || isHist) {
+    // Create income transaction if order is paid/delivered at creation or historical
+    if (isPaidOnCreate || isHist) {
+      const hst     = getHstConfig(db);
       const txnDate = paid_date || hist_date || order_date || new Date().toISOString().split('T')[0];
       const txnDesc = isHist
         ? `Order ${order_number} — ${customer_name} (historical)`
@@ -111,11 +125,7 @@ router.post('/', authenticate, authorize('owner', 'manager'),
       db.prepare(`
         INSERT INTO transactions (date, description, category, type, amount_cad, hst_amount, order_id, created_by)
         VALUES (?, ?, 'sales', 'income', ?, ?, ?, ?)
-      `).run(
-        txnDate, txnDesc, price_cad,
-        parseFloat((price_cad * 0.13).toFixed(2)),
-        order.id, req.user.id
-      );
+      `).run(txnDate, txnDesc, price_cad, calcHst(price_cad, hst), order.id, req.user.id);
     }
 
     audit({ userId: req.user.id, userName: req.user.name, action: 'create', tableName: 'orders', recordId: order.id, newValue: order });
@@ -124,9 +134,9 @@ router.post('/', authenticate, authorize('owner', 'manager'),
   }
 );
 
-// PATCH /api/orders/:id  — status update available to all, full edit to owner/manager
+// PATCH /api/orders/:id
 router.patch('/:id', authenticate,
-  body('status').optional().isIn(['new','queued','quoted','confirmed','printing','printed','post-processing','qc','packed','shipped','delivered','paid','cancelled']),
+  body('status').optional().isIn(VALID_STATUSES),
   (req, res) => {
     const db = getDb();
     const existing = db.prepare('SELECT * FROM orders WHERE id = ?').get(req.params.id);
@@ -149,7 +159,6 @@ router.patch('/:id', authenticate,
     const becomingPaid      = ['delivered','paid'].includes(newStatus) && !wasDelivered;
     const becomingCancelled = newStatus === 'cancelled' && wasDelivered;
 
-    // Stamp paid_at on first payment if not already set or explicitly provided
     if (becomingPaid && !existing.paid_at && !updates.paid_at) {
       updates.paid_at = new Date().toISOString();
     }
@@ -161,37 +170,31 @@ router.patch('/:id', authenticate,
 
     const updated = db.prepare('SELECT * FROM orders WHERE id = ?').get(existing.id);
 
-    // Create income transaction when a live order is first marked paid/delivered
+    // Create income transaction on first payment of a live order
     if (becomingPaid && !existing.paid_at && !existing.is_historical) {
       const existingTxn = db.prepare(
         'SELECT id FROM transactions WHERE order_id = ? AND type = ?'
       ).get(existing.id, 'income');
-
       if (!existingTxn) {
-        // Use the paid_at date we just set (may be backdated if explicitly passed)
+        const hst     = getHstConfig(db);
         const txnDate = updates.paid_at
           ? updates.paid_at.split('T')[0]
           : new Date().toISOString().split('T')[0];
-
         db.prepare(`
           INSERT INTO transactions (date, description, category, type, amount_cad, hst_amount, order_id, created_by)
           VALUES (?, ?, 'sales', 'income', ?, ?, ?, ?)
         `).run(
           txnDate,
           `Order ${existing.order_number} — ${existing.customer_name}`,
-          existing.price_cad,
-          parseFloat((existing.price_cad * 0.13).toFixed(2)),
-          existing.id,
-          req.user.id
+          existing.price_cad, calcHst(existing.price_cad, hst),
+          existing.id, req.user.id
         );
       }
     }
 
-    // Reverse revenue if a delivered order is cancelled
+    // Reverse revenue if order cancelled after being paid
     if (becomingCancelled) {
-      db.prepare(
-        'DELETE FROM transactions WHERE order_id = ? AND type = ?'
-      ).run(existing.id, 'income');
+      db.prepare('DELETE FROM transactions WHERE order_id = ? AND type = ?').run(existing.id, 'income');
     }
 
     audit({ userId: req.user.id, userName: req.user.name, action: 'update', tableName: 'orders', recordId: existing.id, oldValue: existing, newValue: updates });
@@ -200,20 +203,16 @@ router.patch('/:id', authenticate,
   }
 );
 
-// DELETE /api/orders/:id  — owner only, cascades all related data
+// DELETE /api/orders/:id
 router.delete('/:id', authenticate, authorize('owner'), (req, res) => {
   const db = getDb();
   const existing = db.prepare('SELECT * FROM orders WHERE id = ?').get(req.params.id);
   if (!existing) return res.status(404).json({ error: 'Order not found' });
-
   try {
     db.pragma('foreign_keys = OFF');
     db.prepare('DELETE FROM transactions WHERE order_id = ?').run(existing.id);
     db.prepare('DELETE FROM orders WHERE id = ?').run(existing.id);
-  } finally {
-    db.pragma('foreign_keys = ON');
-  }
-
+  } finally { db.pragma('foreign_keys = ON'); }
   audit({ userId: req.user.id, userName: req.user.name, action: 'delete', tableName: 'orders', recordId: existing.id, oldValue: existing });
   broadcast('order:deleted', { id: existing.id });
   res.json({ message: 'Order deleted' });
