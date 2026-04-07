@@ -3,6 +3,21 @@
 
 export const CHANGELOG = [
   {
+    version: '1.1.9',
+    date: '2026-04-07',
+    title: 'Customer Portal — Moved to Browser',
+    highlights: [
+      'Order tracking portal is now a public browser page at /track on the server',
+      'Order Portal tab in the app is now a link manager — copy tracking URLs per order',
+    ],
+    changes: [
+      { type: 'fix',  text: 'Customer Portal — moved from inside the Electron app to a public web page served at http://[server]:3001/track' },
+      { type: 'new',  text: 'Customer Portal — supports ?order=1001 query param so email links auto-fill and look up the order' },
+      { type: 'new',  text: 'Order Portal tab — now shows the portal URLs (LAN + Tailscale remote) with copy and open buttons' },
+      { type: 'new',  text: 'Order Portal tab — lists all active orders with their direct tracking links ready to copy into emails' },
+    ],
+  },
+  {
     version: '1.1.8',
     date: '2026-04-07',
     title: 'Customer Portal, Recurring Orders, Receipt Uploads & Crash Reporting',
