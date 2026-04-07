@@ -327,7 +327,7 @@ export default function OrdersPage() {
 
   const F = k => ({ value: form[k]??'', onChange: e => setForm(f=>({...f,[k]:e.target.value})) });
 
-  const revenue = filtered.filter(o=>o.status!=='cancelled').reduce((a,o)=>a+(o.price_cad||0),0);
+  const revenue = filtered.filter(o => o.status === 'paid').reduce((a,o) => a+(o.price_cad||0), 0);
   const pending = filtered.filter(o=>['new','quoted','confirmed'].includes(o.status)).length;
 
   const isPaid    = PAID_STATUSES.includes(form.status);
@@ -355,9 +355,9 @@ export default function OrdersPage() {
         <div style={{ display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:14,marginBottom:20 }}>
           {[
             ['Total Orders', orders.length],
-            ['Pending', pending],
+            ['Active', activeOrders.length],
             ['In Progress', orders.filter(o=>['printing','printed','post-processing','packed'].includes(o.status)).length],
-            ['Revenue', `$${orders.filter(o=>o.status!=='cancelled').reduce((a,o)=>a+(o.price_cad||0),0).toFixed(2)}`],
+            ['Collected Revenue', `${orders.filter(o=>o.status==='paid').reduce((a,o)=>a+(o.price_cad||0),0).toFixed(2)}`],
           ].map(([l,v])=>(
             <div key={l} className="card" style={{ padding:16 }}>
               <div style={{ fontSize:11,fontWeight:600,textTransform:'uppercase',letterSpacing:'0.05em',color:'var(--text-tertiary)',marginBottom:6 }}>{l}</div>

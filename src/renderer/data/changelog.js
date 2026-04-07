@@ -3,6 +3,25 @@
 
 export const CHANGELOG = [
   {
+    version: '1.0.33',
+    date: '2026-04-07',
+    title: 'Orders & Customer Fix — Requires App Rebuild',
+    highlights: [
+      'Orders page now shows all orders including historical when toggled',
+      'Customers page now counts all orders including historical ones',
+      'Revenue counter on Orders page only counts paid orders',
+      'Dashboard fixes for active orders and revenue',
+    ],
+    changes: [
+      { type: 'fix',     text: 'Orders — fetches ?historical=all so paid historical orders appear when Show Completed is toggled on' },
+      { type: 'fix',     text: 'Orders — Collected Revenue metric now only counts orders with status=paid (not all non-cancelled)' },
+      { type: 'fix',     text: 'Orders — Active metric replaces Pending to show correct count of non-completed orders' },
+      { type: 'fix',     text: 'Customers — fetches ?historical=all so historical orders count toward customer order totals and spent amounts' },
+      { type: 'fix',     text: 'Dashboard — revenue MTD includes historical transactions, active orders excludes paid, weekly chart includes all revenue' },
+      { type: 'improve', text: 'NOTE: These fixes require a new app install (v1.0.33) — server-only deploys do not update the Electron app UI' },
+    ],
+  },
+  {
     version: '1.0.32',
     date: '2026-04-07',
     title: 'Customer Order History Fix, Orders Filter & Dashboard Revenue Fix',
