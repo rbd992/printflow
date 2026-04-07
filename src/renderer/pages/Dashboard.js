@@ -18,11 +18,16 @@ function StatusPill({ status }) {
   const map = {
     new:       ['pill-purple', 'New'],
     queued:    ['pill-blue',   'Queued'],
+    quoted:    ['pill-purple', 'Quoted'],
+    confirmed: ['pill-green',  'Confirmed'],
     printing:  ['pill-amber',  'Printing'],
+    printed:   ['pill-teal',   'Printed'],
+    'post-processing': ['pill-amber', 'Post-Processing'],
     qc:        ['pill-teal',   'QC Check'],
     packed:    ['pill-teal',   'Packed'],
     shipped:   ['pill-green',  'Shipped'],
     delivered: ['pill-green',  'Delivered'],
+    paid:      ['pill-green',  '✅ Paid'],
     cancelled: ['pill-red',    'Cancelled'],
   };
   const [cls, label] = map[status] || ['pill-blue', status];
@@ -182,7 +187,7 @@ export default function Dashboard() {
               </tr>
             </thead>
             <tbody>
-              {recent_orders.filter(o => !['delivered','cancelled'].includes(o.status)).slice(0, 8).map(o => (
+              {recent_orders.filter(o => !['delivered','paid','cancelled'].includes(o.status)).slice(0, 8).map(o => (
                 <tr key={o.id}>
                   <td style={{ fontWeight: 600, color: 'var(--accent)' }}>{o.order_number}</td>
                   <td>{o.customer_name}</td>

@@ -66,19 +66,25 @@ router.post('/', authenticate, authorize('owner', 'manager'),
     const isHist    = !!is_historical;
     const hist_date = isHist ? (historical_date || order_date || null) : null;
 
-    // Determine created_at — use order_date if provided, else historical_date for hist orders, else now
     const created_at_val = order_date
       ? new Date(order_date).toISOString()
       : hist_date
         ? new Date(hist_date).toISOString()
         : new Date().toISOString();
 
-    // Determine paid_at — use paid_date if provided, else historical_date for hist orders, else null
-    const paid_at_val = isHist
+    // Respect the status sent from the client — validate it
+    const VALID_STATUSES = ['new','queued','quoted','confirmed','printing','printed',
+      'post-processing','qc','packed','shipped','delivered','paid','cancelled'];
+    const sentStatus = req.body.status;
+    const resolvedStatus = VALID_STATUSES.includes(sentStatus)
+      ? sentStatus
+      : isHist ? 'paid' : 'new';
+
+    // Set paid_at if order is being created as paid/delivered
+    const isPaid = ['paid','delivered'].includes(resolvedStatus);
+    const paid_at_val = isPaid || isHist
       ? (paid_date || hist_date || order_date || new Date().toISOString().split('T')[0])
       : (paid_date || null);
-
-    const status = isHist ? 'delivered' : 'new';
 
     const result = db.prepare(`
       INSERT INTO orders (
@@ -89,27 +95,26 @@ router.post('/', authenticate, authorize('owner', 'manager'),
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       order_number, customer_name, customer_email ?? null, platform?.trim() || 'direct', description,
-      filament_id ?? null, price_cad, shipping_cad ?? 0, due_date ?? null, notes ?? null, status,
+      filament_id ?? null, price_cad, shipping_cad ?? 0, due_date ?? null, notes ?? null, resolvedStatus,
       paid_at_val, payment_method ?? null, isHist ? 1 : 0, hist_date, req.user.id,
       created_at_val, created_at_val
     );
 
     const order = db.prepare('SELECT * FROM orders WHERE id = ?').get(result.lastInsertRowid);
 
-    // Create income transaction for historical orders (already paid)
-    // Transaction date = paid_date if provided, else historical_date, else order_date, else today
-    if (isHist) {
+    // Create income transaction if order is created as paid/delivered or is historical
+    if (isPaid || isHist) {
       const txnDate = paid_date || hist_date || order_date || new Date().toISOString().split('T')[0];
+      const txnDesc = isHist
+        ? `Order ${order_number} — ${customer_name} (historical)`
+        : `Order ${order_number} — ${customer_name}`;
       db.prepare(`
         INSERT INTO transactions (date, description, category, type, amount_cad, hst_amount, order_id, created_by)
         VALUES (?, ?, 'sales', 'income', ?, ?, ?, ?)
       `).run(
-        txnDate,
-        `Order ${order_number} — ${customer_name} (historical)`,
-        price_cad,
+        txnDate, txnDesc, price_cad,
         parseFloat((price_cad * 0.13).toFixed(2)),
-        order.id,
-        req.user.id
+        order.id, req.user.id
       );
     }
 

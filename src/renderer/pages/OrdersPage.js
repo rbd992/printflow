@@ -231,15 +231,21 @@ export default function OrdersPage() {
       const payload = {
         ...form,
         price_cad:  parseFloat(form.price_cad) || 0,
+        // Ensure status is passed explicitly — server respects it for historical orders
+        status: form.status || 'new',
         // Convert local datetime back to ISO for the server
         order_date: form.order_date_local ? localToISO(form.order_date_local) : undefined,
         paid_date:  form.paid_date_local  ? localToISO(form.paid_date_local)  : undefined,
       };
 
-      // When saving an existing order with status=paid, pass paid_at explicitly
-      if (editing?.id && PAID_STATUSES.includes(payload.status) && payload.paid_date) {
-        payload.paid_at  = payload.paid_date;
-        payload.created_at = payload.order_date || undefined;
+      // For existing orders being saved as paid, pass paid_at explicitly
+      if (editing?.id) {
+        if (PAID_STATUSES.includes(payload.status) && payload.paid_date) {
+          payload.paid_at   = payload.paid_date;
+        }
+        if (payload.order_date) {
+          payload.created_at = payload.order_date;
+        }
       }
 
       // Clean up UI-only fields
