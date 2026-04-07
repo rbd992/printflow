@@ -28,6 +28,9 @@ const backupRoutes         = require('./routes/backup');
 const octoprintRoutes      = require('./routes/octoprint');
 const klipperRoutes        = require('./routes/klipper');
 const emailRoutes          = require('./routes/email');
+const portalRoutes         = require('./routes/portal');
+const recurringRoutes      = require('./routes/recurring');
+const crashRoutes          = require('./routes/crash');
 
 const app = express();
 
@@ -89,6 +92,9 @@ app.use('/api/backup',        backupRoutes);
 app.use('/api/octoprint',     octoprintRoutes);
 app.use('/api/klipper',       klipperRoutes);
 app.use('/api/email',         emailRoutes);
+app.use('/api/portal',        portalRoutes);
+app.use('/api/recurring',     recurringRoutes);
+app.use('/api/crash',         crashRoutes);
 
 // ── Camera popout viewer page ──────────────────────────────────
 app.get('/camera-popout', (req, res) => {

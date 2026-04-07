@@ -29,6 +29,7 @@ import PrintHistoryPage from './pages/PrintHistoryPage';
 import HelpPage          from './pages/HelpPage';
 import EulaPage          from './pages/EulaPage';
 import OnboardingPage    from './pages/OnboardingPage';
+import CustomerPortalPage from './pages/CustomerPortalPage';
 
 function AuthGuard({ children, roles }) {
   const { token, user } = useAuthStore();
@@ -128,6 +129,7 @@ export default function App() {
           <Route path="changelog" element={<ChangelogPage />} />
           <Route path="settings"  element={<SettingsPage onThemeChange={setTheme} />} />
           <Route path="help"      element={<HelpPage />} />
+          <Route path="portal"    element={<AuthGuard roles={['owner','manager']}><CustomerPortalPage /></AuthGuard>} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

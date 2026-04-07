@@ -118,6 +118,10 @@ export default function FinancePage() {
     URL.revokeObjectURL(url);
   }
 
+  function handleReceiptUpdate(updatedTxn) {
+    setTransactions(prev => prev.map(t => t.id === updatedTxn.id ? { ...t, ...updatedTxn } : t));
+  }
+
   const F = k => ({ value: form[k]??'', onChange: e => setForm(f=>({...f,[k]:e.target.value})) });
 
   const TAB_STYLE = (active) => ({
@@ -202,7 +206,7 @@ export default function FinancePage() {
             </div>
 
             {/* Full ledger */}
-            <TransactionTable transactions={transactions.slice(0,100)} title="All Transactions" onExport={() => exportCSV(transactions,'transactions-all.csv')}/>
+            <TransactionTable transactions={transactions.slice(0,100)} title="All Transactions" onExport={() => exportCSV(transactions,'transactions-all.csv')} onReceiptUpdate={handleReceiptUpdate}/>
           </>
         )}
 
@@ -237,7 +241,7 @@ export default function FinancePage() {
               ))}
             </div>
 
-            <TransactionTable transactions={monthTxns} title={`${MONTHS[selectedMonth-1]} ${selectedYear} Transactions`} onExport={() => exportCSV(monthTxns,`transactions-${selectedYear}-${String(selectedMonth).padStart(2,'0')}.csv`)}/>
+            <TransactionTable transactions={monthTxns} title={`${MONTHS[selectedMonth-1]} ${selectedYear} Transactions`} onExport={() => exportCSV(monthTxns,`transactions-${selectedYear}-${String(selectedMonth).padStart(2,'0')}.csv`)} onReceiptUpdate={handleReceiptUpdate}/>
           </>
         )}
 
@@ -313,7 +317,7 @@ export default function FinancePage() {
               </table>
             </div>
 
-            <TransactionTable transactions={yearTxns} title={`${selectedYear} Transactions`} onExport={() => exportCSV(yearTxns,`transactions-${selectedYear}.csv`)}/>
+            <TransactionTable transactions={yearTxns} title={`${selectedYear} Transactions`} onExport={() => exportCSV(yearTxns,`transactions-${selectedYear}.csv`)} onReceiptUpdate={handleReceiptUpdate}/>
           </>
         )}
       </div>
@@ -353,8 +357,67 @@ export default function FinancePage() {
   );
 }
 
-function TransactionTable({ transactions, title, onExport }) {
+function TransactionTable({ transactions, title, onExport, onReceiptUpdate }) {
+  const { token } = require('../stores/authStore').useAuthStore();
+  const { getServerUrl } = require('../api/client');
+  const serverUrl = getServerUrl();
+  const [uploadingId, setUploadingId] = useState(null);
+  const [previewTxn, setPreviewTxn]   = useState(null);
+  const fileInputRef = React.useRef();
+  const pendingTxnRef = React.useRef(null);
+
+  async function handleReceiptUpload(txn, file) {
+    if (!file) return;
+    setUploadingId(txn.id);
+    try {
+      const formData = new FormData();
+      formData.append('receipt', file);
+      const r = await fetch(`${serverUrl}/api/transactions/${txn.id}/receipt`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: formData,
+      });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error);
+      if (onReceiptUpdate) onReceiptUpdate(data.transaction);
+    } catch (e) { alert('Upload failed: ' + e.message); }
+    setUploadingId(null);
+  }
+
+  async function removeReceipt(txn) {
+    if (!window.confirm('Remove this receipt?')) return;
+    setUploadingId(txn.id);
+    try {
+      await fetch(`${serverUrl}/api/transactions/${txn.id}/receipt`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (onReceiptUpdate) onReceiptUpdate({ ...txn, receipt_url: null, receipt_filename: null });
+    } catch {}
+    setUploadingId(null);
+  }
+
   return (
+    <>
+      {previewTxn && (
+        <div style={{ position:'fixed',inset:0,zIndex:500,background:'rgba(0,0,0,0.8)',backdropFilter:'blur(8px)',display:'flex',alignItems:'center',justifyContent:'center' }}
+          onClick={()=>setPreviewTxn(null)}>
+          <div style={{ maxWidth:'90vw',maxHeight:'90vh',position:'relative' }}>
+            <img
+              src={`${serverUrl}${previewTxn.receipt_url}?token=${encodeURIComponent(token)}`}
+              alt="Receipt"
+              style={{ maxWidth:'100%',maxHeight:'88vh',borderRadius:12,objectFit:'contain' }}
+            />
+            <button onClick={()=>setPreviewTxn(null)}
+              style={{ position:'absolute',top:-12,right:-12,width:30,height:30,borderRadius:'50%',background:'var(--bg-card)',border:'0.5px solid var(--border)',cursor:'pointer',fontSize:16,display:'flex',alignItems:'center',justifyContent:'center' }}>✕</button>
+            <div style={{ textAlign:'center',marginTop:10,fontSize:12,color:'rgba(255,255,255,0.6)' }}>
+              {previewTxn.receipt_filename || 'Receipt'}
+            </div>
+          </div>
+        </div>
+      )}
+      <input ref={fileInputRef} type="file" accept="image/*" style={{ display:'none' }}
+        onChange={e => { if (e.target.files[0]) handleReceiptUpload(pendingTxnRef.current, e.target.files[0]); e.target.value=''; }} />
     <div className="card">
       <div style={{ padding:'14px 20px', borderBottom:'0.5px solid var(--border)', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
         <h3>{title}</h3>
@@ -365,7 +428,7 @@ function TransactionTable({ transactions, title, onExport }) {
       ) : (
         <table className="data-table">
           <thead>
-            <tr><th>Date</th><th>Description</th><th>Category</th><th>Type</th><th>HST</th><th>Amount</th></tr>
+            <tr><th>Date</th><th>Description</th><th>Category</th><th>Type</th><th>HST</th><th>Amount</th><th style={{width:36}}>📎</th></tr>
           </thead>
           <tbody>
             {transactions.map(t => (
@@ -381,11 +444,28 @@ function TransactionTable({ transactions, title, onExport }) {
                 <td style={{ fontWeight:700, color:t.type==='income'?'var(--green)':'var(--red)' }}>
                   {t.type==='income'?'+':'-'}${t.amount_cad?.toFixed(2)}
                 </td>
+                <td style={{ textAlign:'center' }}>
+                  {uploadingId === t.id ? (
+                    <div style={{ width:20,height:20,border:'2px solid rgba(255,255,255,0.15)',borderTopColor:'var(--accent)',borderRadius:'50%',animation:'spin 0.7s linear infinite',margin:'0 auto' }}/>
+                  ) : t.receipt_url ? (
+                    <div style={{ display:'flex',gap:3,justifyContent:'center' }}>
+                      <button title="View receipt" onClick={()=>setPreviewTxn(t)}
+                        style={{ background:'none',border:'none',cursor:'pointer',fontSize:14,padding:2 }}>🧾</button>
+                      <button title="Remove receipt" onClick={()=>removeReceipt(t)}
+                        style={{ background:'none',border:'none',cursor:'pointer',fontSize:11,padding:2,color:'var(--text-tertiary)' }}>✕</button>
+                    </div>
+                  ) : t.type === 'expense' ? (
+                    <button title="Attach receipt" onClick={()=>{ pendingTxnRef.current=t; fileInputRef.current.click(); }}
+                      style={{ background:'none',border:'none',cursor:'pointer',fontSize:13,padding:2,opacity:0.4,transition:'opacity 0.15s' }}
+                      onMouseEnter={e=>e.target.style.opacity=1} onMouseLeave={e=>e.target.style.opacity=0.4}>📎</button>
+                  ) : null}
+                </td>
               </tr>
             ))}
           </tbody>
         </table>
       )}
     </div>
+    </>
   );
 }

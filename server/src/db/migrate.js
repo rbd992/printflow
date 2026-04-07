@@ -295,6 +295,20 @@ const migrations = [
       ALTER TABLE printers ADD COLUMN connection_type TEXT NOT NULL DEFAULT 'bambu_lan';
     `,
   },
+  {
+    version: 8,
+    name: 'recurring_orders_and_receipt_uploads',
+    sql: `
+      ALTER TABLE orders ADD COLUMN is_recurring INTEGER NOT NULL DEFAULT 0;
+      ALTER TABLE orders ADD COLUMN recurring_interval TEXT CHECK(recurring_interval IN ('weekly','biweekly','monthly','quarterly')) DEFAULT NULL;
+      ALTER TABLE orders ADD COLUMN recurring_next_date DATE DEFAULT NULL;
+      ALTER TABLE orders ADD COLUMN recurring_parent_id INTEGER REFERENCES orders(id) DEFAULT NULL;
+      ALTER TABLE transactions ADD COLUMN receipt_url TEXT DEFAULT NULL;
+      ALTER TABLE transactions ADD COLUMN receipt_filename TEXT DEFAULT NULL;
+      CREATE INDEX IF NOT EXISTS idx_orders_recurring     ON orders(is_recurring);
+      CREATE INDEX IF NOT EXISTS idx_orders_recurring_next ON orders(recurring_next_date);
+    `,
+  },
 ];
 
 function runMigrations() {

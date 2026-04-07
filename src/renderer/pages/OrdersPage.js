@@ -242,6 +242,10 @@ export default function OrdersPage() {
         price_cad:  parseFloat(form.price_cad) || 0,
         // Ensure status is passed explicitly — server respects it for historical orders
         status: form.status || 'new',
+        // Recurring fields
+        is_recurring:        form.is_recurring ? 1 : 0,
+        recurring_interval:  form.is_recurring ? (form.recurring_interval || 'monthly') : null,
+        recurring_next_date: form.is_recurring ? (form.recurring_next_date || null) : null,
         // Convert local datetime back to ISO for the server
         order_date: form.order_date_local ? localToISO(form.order_date_local) : undefined,
         paid_date:  form.paid_date_local  ? localToISO(form.paid_date_local)  : undefined,
@@ -406,7 +410,10 @@ export default function OrdersPage() {
               <tbody>
                 {filtered.map(o => (
                   <tr key={o.id} onClick={()=>canManage&&openEdit(o)} style={{ cursor:canManage?'pointer':'default' }}>
-                    <td style={{ fontWeight:600,color:'var(--accent)',fontFamily:'monospace',fontSize:12 }}>{o.order_number}</td>
+                    <td style={{ fontWeight:600,color:'var(--accent)',fontFamily:'monospace',fontSize:12 }}>
+                      {o.order_number}
+                      {o.is_recurring ? <span title="Recurring template" style={{ marginLeft:5,fontSize:10 }}>🔁</span> : null}
+                    </td>
                     <td>
                       <div style={{ fontWeight:500 }}>{o.customer_name}</div>
                       {o.customer_email && <div style={{ fontSize:11,color:'var(--text-tertiary)' }}>{o.customer_email}</div>}
@@ -567,6 +574,42 @@ export default function OrdersPage() {
                 <label className="label">Notes</label>
                 <textarea className="input" rows={2} {...F('notes')} />
               </div>
+
+              {/* Recurring order */}
+              {!form.is_historical && (
+                <div style={{ padding:'12px 14px',background:'var(--bg-hover)',borderRadius:'var(--r-sm)',marginBottom:4 }}>
+                  <div style={{ display:'flex',alignItems:'center',gap:8,marginBottom: form.is_recurring ? 12 : 0 }}>
+                    <input type="checkbox" id="is_recurring" checked={!!form.is_recurring}
+                      onChange={e=>setForm(f=>({...f,is_recurring:e.target.checked,
+                        recurring_interval: e.target.checked ? (f.recurring_interval||'monthly') : null,
+                        recurring_next_date: e.target.checked ? (f.recurring_next_date||new Date(Date.now()+30*86400000).toISOString().split('T')[0]) : null
+                      }))}
+                      style={{ width:15,height:15 }} />
+                    <label htmlFor="is_recurring" style={{ fontSize:13,cursor:'pointer',fontWeight:500 }}>
+                      🔁 Recurring order template
+                    </label>
+                  </div>
+                  {form.is_recurring && (
+                    <div className="form-row" style={{ marginBottom:0 }}>
+                      <div className="form-group">
+                        <label className="label">Repeat every</label>
+                        <select className="select" value={form.recurring_interval||'monthly'}
+                          onChange={e=>setForm(f=>({...f,recurring_interval:e.target.value}))}>
+                          <option value="weekly">Week</option>
+                          <option value="biweekly">2 Weeks</option>
+                          <option value="monthly">Month</option>
+                          <option value="quarterly">Quarter</option>
+                        </select>
+                      </div>
+                      <div className="form-group">
+                        <label className="label">Next order date</label>
+                        <input className="input" type="date" value={form.recurring_next_date||''}
+                          onChange={e=>setForm(f=>({...f,recurring_next_date:e.target.value}))} />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {err && <div style={{ color:'var(--red)',fontSize:12,marginBottom:8 }}>{err}</div>}
 

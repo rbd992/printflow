@@ -3,6 +3,32 @@
 
 export const CHANGELOG = [
   {
+    version: '1.1.8',
+    date: '2026-04-07',
+    title: 'Customer Portal, Recurring Orders, Receipt Uploads & Crash Reporting',
+    highlights: [
+      'Customer order status portal — customers can look up their order with just an order number',
+      'Recurring orders — mark any order as a repeating template (weekly, biweekly, monthly, quarterly)',
+      'Receipt uploads — attach a photo to any expense transaction in Finance',
+      'Crash reporting — unhandled errors are caught and logged to the server',
+    ],
+    changes: [
+      { type: 'new', text: 'Customer Portal — new page in Business section showing a branded order status tracker; customers enter their order number to see live status, tracking info, and estimated due date' },
+      { type: 'new', text: 'Customer Portal — public /api/portal/order/:number endpoint (no auth required); safe subset of order data only' },
+      { type: 'new', text: 'Customer Portal — progress bar with 7 visual steps from Received through Complete' },
+      { type: 'new', text: 'Customer Portal — shows your business name, email, phone from company settings for customer contact' },
+      { type: 'new', text: 'Recurring Orders — toggle on any order form to make it a repeating template; set interval and next date' },
+      { type: 'new', text: 'Recurring Orders — recurring icon shown in orders table; server generates new orders on demand via /api/recurring/generate' },
+      { type: 'new', text: 'Recurring Orders — skip next occurrence or cancel recurring from the API' },
+      { type: 'new', text: 'Receipt Uploads — paperclip icon on every expense row in Finance; click to attach a photo, click receipt icon to view fullscreen, X to remove' },
+      { type: 'new', text: 'Receipt Uploads — images stored in server data/receipts/ folder; served securely with auth token' },
+      { type: 'new', text: 'Crash Reporting — React ErrorBoundary wraps the entire app; unhandled errors show a friendly recovery screen and log to server' },
+      { type: 'new', text: 'Crash Reporting — /api/crash server endpoint receives error reports with version, platform, stack trace' },
+      { type: 'new', text: 'Server — migration 8 adds is_recurring, recurring_interval, recurring_next_date, recurring_parent_id to orders; receipt_url, receipt_filename to transactions' },
+      { type: 'fix', text: 'preload.js — exposes appVersion so crash reports include the correct version string' },
+    ],
+  },
+  {
     version: '1.1.7',
     date: '2026-04-07',
     title: 'Linux AppImage Fix & Tailscale Authkey Rollback',

@@ -24,7 +24,8 @@ contextBridge.exposeInMainWorld('printflow', {
   openExternal: (url) => ipcRenderer.send('shell:openExternal', url),
 
   // Platform info
-  platform: process.platform,
+  platform:   process.platform,
+  appVersion: require('electron').app?.getVersion?.() || require('../../package.json').version,
 
   // Auto-detect best server (LAN vs Tailscale)
   autoDetectServer: () => ipcRenderer.invoke('server:autoDetect'),

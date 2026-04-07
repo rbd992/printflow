@@ -98,6 +98,14 @@ const Icons = {
       <polyline points="2 12 12 17 22 12"/>
     </svg>
   ),
+  portal: (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="10"/>
+      <path d="M12 8v4l3 3"/>
+      <path d="M3.05 11a9 9 0 1 0 .5-3"/>
+      <path d="M3 4v4h4"/>
+    </svg>
+  ),
   help: (
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
       <circle cx="12" cy="12" r="10"/>
@@ -344,7 +352,7 @@ export default function AppShell({ theme, onThemeChange }) {
           </div>
           <div>
             <div style={{ fontSize: 13, fontWeight: 700, letterSpacing: '-0.01em', lineHeight: 1.2 }}>PrintFlow</div>
-            <div style={{ fontSize: 10, color: 'var(--text-tertiary)', textTransform: 'capitalize', lineHeight: 1.4 }}>v1.1.7 · {role}</div>
+            <div style={{ fontSize: 10, color: 'var(--text-tertiary)', textTransform: 'capitalize', lineHeight: 1.4 }}>v1.1.8 · {role}</div>
           </div>
         </div>
 
@@ -375,6 +383,7 @@ export default function AppShell({ theme, onThemeChange }) {
             <NavItem to="/finance"   icon={Icons.finance}   label="Finance"    minRole="manager" userRole={role} />
             <NavItem to="/shipping"  icon={Icons.shipping}  label="Shipping"   minRole="manager" userRole={role} />
             <NavItem to="/marketing" icon={Icons.marketing} label="Marketing"  minRole="manager" userRole={role} />
+            <NavItem to="/portal"    icon={Icons.portal}    label="Order Portal" minRole="manager" userRole={role} />
           </NavSection>
 
           <NavSection label="System">
