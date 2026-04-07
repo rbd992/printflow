@@ -64,6 +64,7 @@ export default function VendorsPage() {
             <div>
               <h3>Automated Ordering</h3>
               <p style={{ fontSize:12,color:'var(--text-secondary)',marginTop:2 }}>Set reorder thresholds per spool on the Filament page to trigger low-stock alerts.</p>
+            </div>
           </div>
           <div style={{ padding:20 }}>
             <div style={{ padding:'14px 16px',background:'var(--bg-hover)',borderRadius:'var(--r-sm)',marginBottom:14 }}>
