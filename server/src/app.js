@@ -4,6 +4,7 @@ const helmet = require('helmet');
 const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
 const logger = require('./services/logger');
+const { getDb } = require('./db/connection');
 
 const authRoutes    = require('./routes/auth');
 const userRoutes    = require('./routes/users');
@@ -145,6 +146,219 @@ fetch(src).then(function(r){
 }).catch(function(e){info.textContent='Error: '+e.message;});
 <\/script></body></html>`;
   res.setHeader('Content-Type', 'text/html');
+  res.send(html);
+});
+
+// ── Customer order tracking portal ────────────────────────────
+// Public page — no auth. Customers visit /track or /track?order=1001
+app.get('/track', (req, res) => {
+  const db = getDb();
+  let biz = { name: 'PrintFlow', email: '', phone: '' };
+  try {
+    const row = db.prepare("SELECT value FROM app_settings WHERE key = 'company_config'").get();
+    if (row?.value) { const c = JSON.parse(row.value); biz = { name: c.name||'PrintFlow', email: c.email||'', phone: c.phone||'' }; }
+  } catch {}
+
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Order Tracking — ${biz.name}</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#0a0a14;color:#e8e8f0;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding:40px 20px}
+  .logo{width:48px;height:48px;border-radius:14px;background:#0071e3;display:flex;align-items:center;justify-content:center;margin:0 auto 16px;box-shadow:0 4px 24px rgba(0,113,227,0.4)}
+  .logo svg{width:28px;height:28px}
+  h1{font-size:22px;font-weight:800;text-align:center;margin-bottom:6px}
+  .sub{font-size:14px;color:#888;text-align:center;margin-bottom:32px}
+  .card{background:#12121e;border:0.5px solid #2a2a3a;border-radius:16px;padding:28px;width:100%;max-width:560px;margin-bottom:16px}
+  .row{display:flex;gap:10px;margin-bottom:0}
+  input{flex:1;background:#1a1a28;border:0.5px solid #2a2a3a;border-radius:10px;padding:12px 16px;font-size:16px;color:#e8e8f0;font-family:monospace;outline:none;transition:border-color 0.15s}
+  input:focus{border-color:#0071e3}
+  input::placeholder{color:#444;font-family:-apple-system,sans-serif;font-size:14px}
+  button{background:#0071e3;color:#fff;border:none;border-radius:10px;padding:12px 24px;font-size:15px;font-weight:600;cursor:pointer;white-space:nowrap;transition:background 0.15s}
+  button:hover{background:#0077ed}
+  button:disabled{background:#333;color:#666;cursor:default}
+  .err{background:rgba(255,59,48,0.1);border:0.5px solid rgba(255,59,48,0.3);border-radius:10px;padding:14px 18px;color:#ff3b30;font-size:14px;margin-top:14px}
+  .result{display:none}
+  .order-num{font-family:monospace;font-size:22px;font-weight:800;color:#0071e3}
+  .badge{display:inline-block;padding:5px 14px;border-radius:20px;font-size:13px;font-weight:700;margin-top:8px}
+  .badge.active{background:rgba(0,113,227,0.15);color:#0071e3}
+  .badge.done{background:rgba(48,209,88,0.15);color:#30d158}
+  .badge.cancelled{background:rgba(255,59,48,0.15);color:#ff3b30}
+  .desc{margin-top:16px;padding:12px 14px;background:#1a1a28;border-radius:10px;font-size:14px;line-height:1.6;color:#b0b0c0}
+  .steps{display:flex;align-items:flex-start;justify-content:space-between;margin:24px 0;position:relative}
+  .steps::before{content:'';position:absolute;top:18px;left:6%;right:6%;height:2px;background:#2a2a3a;z-index:0}
+  .step{display:flex;flex-direction:column;align-items:center;gap:6px;z-index:1;flex:1}
+  .step-dot{width:36px;height:36px;border-radius:50%;border:2px solid #2a2a3a;background:#12121e;display:flex;align-items:center;justify-content:center;font-size:15px;transition:all 0.3s}
+  .step-dot.done{border-color:#0071e3;background:#0071e3}
+  .step-dot.future{border-color:#2a2a3a;background:#12121e}
+  .step-label{font-size:9px;font-weight:600;color:#555;text-align:center;max-width:60px;line-height:1.3;text-transform:uppercase;letter-spacing:0.04em}
+  .step-label.done{color:#0071e3}
+  .progress-line{position:absolute;top:18px;left:6%;height:2px;background:#0071e3;z-index:0;transition:width 0.5s ease;border-radius:2px}
+  .meta{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:16px}
+  .meta-item{background:#1a1a28;border-radius:10px;padding:12px 14px}
+  .meta-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:#555;margin-bottom:4px}
+  .meta-value{font-size:14px;font-weight:600}
+  .tracking-box{margin-top:14px;padding:14px 16px;background:rgba(0,113,227,0.08);border:0.5px solid rgba(0,113,227,0.25);border-radius:10px}
+  .tracking-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:#0071e3;margin-bottom:6px}
+  .tracking-num{font-family:monospace;font-size:16px;font-weight:700}
+  .tracking-carrier{font-size:12px;color:#888;margin-top:2px}
+  .contact{text-align:center;font-size:13px;color:#555;margin-top:8px}
+  .contact a{color:#0071e3;text-decoration:none}
+  @media(max-width:480px){.meta{grid-template-columns:1fr}.steps{gap:0}.step-label{display:none}}
+</style>
+</head>
+<body>
+<div class="logo">
+  <svg viewBox="0 0 80 80" fill="none"><rect x="8" y="12" width="6" height="40" rx="3" fill="white" opacity="0.6"/><rect x="66" y="12" width="6" height="40" rx="3" fill="white" opacity="0.6"/><rect x="8" y="10" width="64" height="8" rx="4" fill="white" opacity="0.8"/><rect x="31" y="12" width="18" height="11" rx="3" fill="white"/><path d="M37 23 L40 30 L43 23 Z" fill="white"/><rect x="27" y="48" width="26" height="5" rx="2" fill="white" opacity="0.7"/><rect x="10" y="57" width="60" height="8" rx="3" fill="white" opacity="0.7"/></svg>
+</div>
+<h1>${biz.name}</h1>
+<p class="sub">Enter your order number to check your print status</p>
+
+<div class="card">
+  <div class="row">
+    <input id="orderInput" type="text" placeholder="Order number e.g. 1001" autocomplete="off" autocorrect="off" spellcheck="false" />
+    <button id="trackBtn" onclick="lookup()">Track</button>
+  </div>
+  <div id="errBox" class="err" style="display:none"></div>
+</div>
+
+<div id="result" class="card result">
+  <div style="display:flex;justify-content:space-between;align-items:flex-start">
+    <div>
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:#555;margin-bottom:4px">Order</div>
+      <div class="order-num" id="rOrderNum"></div>
+    </div>
+    <div id="rBadge" class="badge active"></div>
+  </div>
+
+  <div id="stepsWrap" style="position:relative;margin:24px 0">
+    <div class="steps" id="stepsRow"></div>
+    <div class="progress-line" id="progressLine"></div>
+  </div>
+
+  <div id="cancelledNote" style="display:none;padding:12px 14px;background:rgba(255,59,48,0.08);border-radius:10px;color:#ff3b30;font-size:13px;margin-bottom:12px">
+    This order has been cancelled. Please contact us if you have questions.
+  </div>
+
+  <div class="desc" id="rDesc"></div>
+
+  <div class="meta">
+    <div class="meta-item"><div class="meta-label">Order Placed</div><div class="meta-value" id="rDate"></div></div>
+    <div class="meta-item" id="rDueWrap"><div class="meta-label">Due Date</div><div class="meta-value" id="rDue"></div></div>
+  </div>
+
+  <div id="rTrackingWrap" class="tracking-box" style="display:none">
+    <div class="tracking-label">📦 Tracking</div>
+    <div class="tracking-num" id="rTracking"></div>
+    <div class="tracking-carrier" id="rCarrier"></div>
+  </div>
+
+  <div id="rNotesWrap" style="display:none;margin-top:14px;padding:12px 14px;background:#1a1a28;border-radius:10px;font-size:13px;color:#888;line-height:1.6">
+    <span style="font-weight:700;color:#666;display:block;margin-bottom:4px">Notes</span>
+    <span id="rNotes"></span>
+  </div>
+</div>
+
+${biz.email||biz.phone ? `<p class="contact">Questions? ${biz.email?`<a href="mailto:${biz.email}">${biz.email}</a>`:''} ${biz.phone?`&middot; ${biz.phone}`:''}</p>` : ''}
+
+<script>
+const STEPS = [
+  {key:'new',      label:'Received',  icon:'📋'},
+  {key:'queued',   label:'In Queue',   icon:'⏳'},
+  {key:'printing', label:'Printing',   icon:'🖨️'},
+  {key:'qc',       label:'QC Check',   icon:'🔍'},
+  {key:'packed',   label:'Packed',     icon:'📦'},
+  {key:'shipped',  label:'Shipped',    icon:'🚚'},
+  {key:'paid',     label:'Complete',   icon:'✅'},
+];
+const STATUS_STEP = {
+  new:0, queued:1, quoted:1, confirmed:1,
+  printing:2, printed:2, 'post-processing':2,
+  qc:3, packed:4, shipped:5, delivered:6, paid:6, cancelled:-1
+};
+
+function fmt(d){if(!d)return'—';return new Date(d).toLocaleDateString('en-CA',{year:'numeric',month:'long',day:'numeric'});}
+
+// Auto-fill from ?order= query param
+const params=new URLSearchParams(location.search);
+const pre=params.get('order');
+if(pre){document.getElementById('orderInput').value=pre;}
+
+document.getElementById('orderInput').addEventListener('keydown',function(e){if(e.key==='Enter')lookup();});
+
+async function lookup(){
+  const raw=document.getElementById('orderInput').value.trim().replace(/^#+/,'');
+  if(!raw)return;
+  document.getElementById('errBox').style.display='none';
+  document.getElementById('result').style.display='none';
+  const btn=document.getElementById('trackBtn');
+  btn.disabled=true; btn.textContent='Tracking…';
+  try{
+    const r=await fetch('/api/portal/order/%23'+encodeURIComponent(raw));
+    const d=await r.json();
+    if(!r.ok){showErr(d.error||'Order not found.');return;}
+    showResult(d);
+  }catch(e){showErr('Could not reach server. Try again.');}
+  finally{btn.disabled=false;btn.textContent='Track';}
+}
+
+function showErr(msg){
+  const b=document.getElementById('errBox');
+  b.textContent=msg; b.style.display='block';
+}
+
+function showResult(o){
+  document.getElementById('rOrderNum').textContent=o.order_number;
+  document.getElementById('rDesc').textContent=o.description;
+  document.getElementById('rDate').textContent=fmt(o.created_at);
+
+  const dueWrap=document.getElementById('rDueWrap');
+  if(o.due_date){document.getElementById('rDue').textContent=fmt(o.due_date);dueWrap.style.display='';}else{dueWrap.style.display='none';}
+
+  const badge=document.getElementById('rBadge');
+  badge.textContent=o.status_label;
+  badge.className='badge '+(o.status==='cancelled'?'cancelled':o.status==='paid'?'done':'active');
+
+  const cancelled=o.status==='cancelled';
+  document.getElementById('cancelledNote').style.display=cancelled?'':'none';
+
+  // Progress steps
+  const step=STATUS_STEP[o.status]??0;
+  const row=document.getElementById('stepsRow');
+  row.innerHTML='';
+  STEPS.forEach(function(s,i){
+    const div=document.createElement('div'); div.className='step';
+    const dot=document.createElement('div'); dot.className='step-dot '+(i<=step&&!cancelled?'done':'future');
+    dot.textContent=i<=step&&!cancelled?s.icon:'';
+    const lbl=document.createElement('div'); lbl.className='step-label '+(i<=step&&!cancelled?'done':'');
+    lbl.textContent=s.label;
+    div.appendChild(dot); div.appendChild(lbl); row.appendChild(div);
+  });
+  document.getElementById('stepsWrap').style.display=cancelled?'none':'';
+  const pct=cancelled?0:Math.min(100,(step/(STEPS.length-1))*88);
+  document.getElementById('progressLine').style.width=pct+'%';
+
+  // Tracking
+  const tw=document.getElementById('rTrackingWrap');
+  if(o.tracking_number){document.getElementById('rTracking').textContent=o.tracking_number;document.getElementById('rCarrier').textContent=o.carrier?'Carrier: '+o.carrier:'';tw.style.display='';}else{tw.style.display='none';}
+
+  // Notes
+  const nw=document.getElementById('rNotesWrap');
+  if(o.notes){document.getElementById('rNotes').textContent=o.notes;nw.style.display='';}else{nw.style.display='none';}
+
+  document.getElementById('result').style.display='block';
+}
+
+// Auto-lookup if order pre-filled
+if(pre)lookup();
+</script>
+</body>
+</html>`;
+
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
   res.send(html);
 });
 
