@@ -344,7 +344,7 @@ export default function AppShell({ theme, onThemeChange }) {
           </div>
           <div>
             <div style={{ fontSize: 13, fontWeight: 700, letterSpacing: '-0.01em', lineHeight: 1.2 }}>PrintFlow</div>
-            <div style={{ fontSize: 10, color: 'var(--text-tertiary)', textTransform: 'capitalize', lineHeight: 1.4 }}>v1.1.3 · {role}</div>
+            <div style={{ fontSize: 10, color: 'var(--text-tertiary)', textTransform: 'capitalize', lineHeight: 1.4 }}>v1.1.4 · {role}</div>
           </div>
         </div>
 
