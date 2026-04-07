@@ -1,13 +1,11 @@
 const { getDb } = require('./connection');
 const logger = require('../services/logger');
 
-// All migrations in order. Never edit existing ones — add new ones.
 const migrations = [
   {
     version: 1,
     name: 'initial_schema',
     sql: `
-      -- Users
       CREATE TABLE IF NOT EXISTS users (
         id            INTEGER PRIMARY KEY AUTOINCREMENT,
         name          TEXT NOT NULL,
@@ -18,8 +16,6 @@ const migrations = [
         created_at    DATETIME NOT NULL DEFAULT (datetime('now')),
         last_login    DATETIME
       );
-
-      -- Vendors
       CREATE TABLE IF NOT EXISTS vendors (
         id          INTEGER PRIMARY KEY AUTOINCREMENT,
         name        TEXT NOT NULL,
@@ -27,8 +23,6 @@ const migrations = [
         notes       TEXT,
         created_at  DATETIME NOT NULL DEFAULT (datetime('now'))
       );
-
-      -- Filament spools
       CREATE TABLE IF NOT EXISTS filament_spools (
         id              INTEGER PRIMARY KEY AUTOINCREMENT,
         brand           TEXT NOT NULL,
@@ -48,8 +42,6 @@ const migrations = [
         created_at      DATETIME NOT NULL DEFAULT (datetime('now')),
         updated_at      DATETIME NOT NULL DEFAULT (datetime('now'))
       );
-
-      -- Printer maintenance parts
       CREATE TABLE IF NOT EXISTS parts (
         id          INTEGER PRIMARY KEY AUTOINCREMENT,
         name        TEXT NOT NULL,
@@ -62,8 +54,6 @@ const migrations = [
         created_at  DATETIME NOT NULL DEFAULT (datetime('now')),
         updated_at  DATETIME NOT NULL DEFAULT (datetime('now'))
       );
-
-      -- Maintenance schedule
       CREATE TABLE IF NOT EXISTS maintenance_tasks (
         id              INTEGER PRIMARY KEY AUTOINCREMENT,
         printer_serial  TEXT NOT NULL,
@@ -75,8 +65,6 @@ const migrations = [
         notes           TEXT,
         created_at      DATETIME NOT NULL DEFAULT (datetime('now'))
       );
-
-      -- Orders
       CREATE TABLE IF NOT EXISTS orders (
         id               INTEGER PRIMARY KEY AUTOINCREMENT,
         order_number     TEXT NOT NULL UNIQUE,
@@ -99,8 +87,6 @@ const migrations = [
         created_at       DATETIME NOT NULL DEFAULT (datetime('now')),
         updated_at       DATETIME NOT NULL DEFAULT (datetime('now'))
       );
-
-      -- Financial transactions
       CREATE TABLE IF NOT EXISTS transactions (
         id           INTEGER PRIMARY KEY AUTOINCREMENT,
         date         DATE NOT NULL,
@@ -113,8 +99,6 @@ const migrations = [
         created_by   INTEGER REFERENCES users(id),
         created_at   DATETIME NOT NULL DEFAULT (datetime('now'))
       );
-
-      -- Printers registry
       CREATE TABLE IF NOT EXISTS printers (
         id           INTEGER PRIMARY KEY AUTOINCREMENT,
         name         TEXT NOT NULL,
@@ -128,8 +112,6 @@ const migrations = [
         notes        TEXT,
         created_at   DATETIME NOT NULL DEFAULT (datetime('now'))
       );
-
-      -- AMS trays (cached state from MQTT)
       CREATE TABLE IF NOT EXISTS ams_trays (
         id              INTEGER PRIMARY KEY AUTOINCREMENT,
         printer_serial  TEXT NOT NULL REFERENCES printers(serial),
@@ -142,8 +124,6 @@ const migrations = [
         updated_at      DATETIME NOT NULL DEFAULT (datetime('now')),
         UNIQUE(printer_serial, ams_unit, tray_index)
       );
-
-      -- Audit log
       CREATE TABLE IF NOT EXISTS audit_log (
         id          INTEGER PRIMARY KEY AUTOINCREMENT,
         user_id     INTEGER REFERENCES users(id),
@@ -156,15 +136,11 @@ const migrations = [
         ip_address  TEXT,
         created_at  DATETIME NOT NULL DEFAULT (datetime('now'))
       );
-
-      -- Schema version tracking
       CREATE TABLE IF NOT EXISTS schema_migrations (
         version     INTEGER PRIMARY KEY,
         name        TEXT NOT NULL,
         applied_at  DATETIME NOT NULL DEFAULT (datetime('now'))
       );
-
-      -- Indexes
       CREATE INDEX IF NOT EXISTS idx_orders_status     ON orders(status);
       CREATE INDEX IF NOT EXISTS idx_orders_due_date   ON orders(due_date);
       CREATE INDEX IF NOT EXISTS idx_orders_created_at ON orders(created_at);
@@ -200,27 +176,18 @@ const migrations = [
     version: 4,
     name: 'order_payment_and_historical_tracking',
     sql: `
-      -- Add payment tracking to orders
       ALTER TABLE orders ADD COLUMN paid_at DATETIME;
       ALTER TABLE orders ADD COLUMN payment_method TEXT CHECK(payment_method IN ('cash','card','etransfer','paypal','other'));
-
-      -- Add historical import flag — orders from before PrintFlow was in use
-      -- Historical orders appear in history/records but are excluded from live reporting
       ALTER TABLE orders ADD COLUMN is_historical INTEGER NOT NULL DEFAULT 0;
       ALTER TABLE orders ADD COLUMN historical_date DATE;
-
-      -- Index for payment and historical queries
-      CREATE INDEX IF NOT EXISTS idx_orders_paid_at     ON orders(paid_at);
-      CREATE INDEX IF NOT EXISTS idx_orders_historical  ON orders(is_historical);
+      CREATE INDEX IF NOT EXISTS idx_orders_paid_at    ON orders(paid_at);
+      CREATE INDEX IF NOT EXISTS idx_orders_historical ON orders(is_historical);
     `,
   },
   {
     version: 5,
     name: 'widen_platform_field',
     sql: `
-      -- SQLite cannot ALTER a CHECK constraint, so we recreate the orders table
-      -- with an open-ended platform field to support any sales channel.
-      -- All existing data is preserved.
       CREATE TABLE IF NOT EXISTS orders_new (
         id               INTEGER PRIMARY KEY AUTOINCREMENT,
         order_number     TEXT NOT NULL UNIQUE,
@@ -262,12 +229,70 @@ const migrations = [
       CREATE INDEX IF NOT EXISTS idx_orders_historical ON orders(is_historical);
     `,
   },
+  {
+    version: 6,
+    name: 'expand_order_statuses',
+    sql: `
+      -- Recreate orders table with full expanded status list
+      PRAGMA foreign_keys = OFF;
+
+      CREATE TABLE orders_new (
+        id               INTEGER PRIMARY KEY AUTOINCREMENT,
+        order_number     TEXT NOT NULL UNIQUE,
+        customer_name    TEXT NOT NULL,
+        customer_email   TEXT,
+        platform         TEXT NOT NULL DEFAULT 'direct',
+        description      TEXT NOT NULL,
+        filament_id      INTEGER REFERENCES filament_spools(id),
+        filament_used_g  REAL,
+        price_cad        REAL NOT NULL DEFAULT 0,
+        shipping_cad     REAL NOT NULL DEFAULT 0,
+        status           TEXT NOT NULL DEFAULT 'new'
+                         CHECK(status IN (
+                           'new','queued','quoted','confirmed',
+                           'printing','printed','post-processing',
+                           'qc','packed','shipped','delivered','paid','cancelled'
+                         )),
+        due_date         DATE,
+        printer_serial   TEXT,
+        tracking_number  TEXT,
+        carrier          TEXT,
+        notes            TEXT,
+        paid_at          DATETIME,
+        payment_method   TEXT CHECK(payment_method IN ('cash','card','etransfer','paypal','other')),
+        is_historical    INTEGER NOT NULL DEFAULT 0,
+        historical_date  DATE,
+        created_by       INTEGER REFERENCES users(id),
+        created_at       DATETIME NOT NULL DEFAULT (datetime('now')),
+        updated_at       DATETIME NOT NULL DEFAULT (datetime('now'))
+      );
+
+      INSERT INTO orders_new SELECT
+        id, order_number, customer_name, customer_email, platform, description,
+        filament_id, filament_used_g, price_cad, shipping_cad,
+        CASE status WHEN 'delivered' THEN 'paid' ELSE status END,
+        due_date, printer_serial, tracking_number, carrier, notes,
+        paid_at, payment_method, is_historical, historical_date,
+        created_by, created_at, updated_at
+      FROM orders;
+
+      DROP TABLE orders;
+      ALTER TABLE orders_new RENAME TO orders;
+
+      CREATE INDEX IF NOT EXISTS idx_orders_status     ON orders(status);
+      CREATE INDEX IF NOT EXISTS idx_orders_due_date   ON orders(due_date);
+      CREATE INDEX IF NOT EXISTS idx_orders_created_at ON orders(created_at);
+      CREATE INDEX IF NOT EXISTS idx_orders_paid_at    ON orders(paid_at);
+      CREATE INDEX IF NOT EXISTS idx_orders_historical ON orders(is_historical);
+
+      PRAGMA foreign_keys = ON;
+    `,
+  },
 ];
 
 function runMigrations() {
   const db = getDb();
 
-  // Ensure migrations table exists
   db.exec(`CREATE TABLE IF NOT EXISTS schema_migrations (
     version    INTEGER PRIMARY KEY,
     name       TEXT NOT NULL,
@@ -287,7 +312,6 @@ function runMigrations() {
   }
 }
 
-// Allow running directly: node src/db/migrate.js
 if (require.main === module) {
   require('dotenv').config();
   runMigrations();
