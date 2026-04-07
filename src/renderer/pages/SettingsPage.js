@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
-import { authApi, settingsApi } from '../api/client';
+import { api, authApi, settingsApi } from '../api/client';
 
 export default function SettingsPage({ onThemeChange }) {
   const { user, serverUrl, setServerUrl, logout } = useAuthStore();

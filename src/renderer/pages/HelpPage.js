@@ -602,7 +602,7 @@ Both components should be kept at the same version for full compatibility. Your 
 Check your server management interface (NAS container manager or equivalent) and confirm the PrintFlow server container is in a running state. If it has stopped, start it and wait about 30 seconds before trying again.
 
 **2. Test the server directly**
-Open a browser and navigate to `http://[your-server-ip]:3001/health`. A brief JSON response confirms the server is accepting connections. If nothing loads, the server is not responding on that port.
+Open a browser and navigate to http://[your-server-ip]:3001/health. A brief JSON response confirms the server is accepting connections. If nothing loads, the server is not responding on that port.
 
 **3. Check your network**
 Confirm your computer is on the same network as the server, or that your remote access connection is active if you are connecting from outside the network.
@@ -681,7 +681,7 @@ Click the information button in the sidebar footer to open the full release note
 **Check the server log**
 The server writes detailed logs that can help identify the source of a problem. The log file is located at:
 
-`\\Synology\printflow1\logs\combined.log`
+\\\\Synology\\printflow1\\logs\\combined.log
 
 Look for entries marked as "error" near the time the issue occurred.
 
@@ -693,9 +693,9 @@ Look for entries marked as "error" near the time the issue occurred.
 - Relevant entries from the server log if applicable
 
 **Key file locations on your server:**
-- Server logs: `\\Synology\printflow1\logs\combined.log`
-- Database: `\\Synology\printflow1\data\printflow.db`
-- Server source: `\\Synology\printflow1\server\src\``,
+- Server logs: \\\\Synology\\printflow1\\logs\\combined.log
+- Database: \\\\Synology\\printflow1\\data\\printflow.db
+- Server source: \\\\Synology\\printflow1\\server\\src\\`,
       },
     ],
   },

@@ -24,6 +24,7 @@ const jobsRoutes          = require('./routes/jobs');
 const customersRoutes     = require('./routes/customers');
 const notificationsRoutes = require('./routes/notifications');
 const cameraRoutes        = require('./routes/camera');
+const backupRoutes         = require('./routes/backup');
 
 const app = express();
 
@@ -81,6 +82,7 @@ app.use('/api/jobs',          jobsRoutes);
 app.use('/api/customers',     customersRoutes);
 app.use('/api/notifications', notificationsRoutes);
 app.use('/api/camera',        cameraRoutes);
+app.use('/api/backup',        backupRoutes);
 
 // ── Camera popout viewer page ──────────────────────────────────
 app.get('/camera-popout', (req, res) => {

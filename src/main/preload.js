@@ -2,10 +2,12 @@ const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('printflow', {
   // Config
-  getServerUrl:  ()      => ipcRenderer.invoke('config:getServerUrl'),
-  setServerUrl:  (url)   => ipcRenderer.invoke('config:setServerUrl', url),
-  getTheme:      ()      => ipcRenderer.invoke('config:getTheme'),
-  setTheme:      (theme) => ipcRenderer.invoke('config:setTheme', theme),
+  getServerUrl:   ()      => ipcRenderer.invoke('config:getServerUrl'),
+  setServerUrl:   (url)   => ipcRenderer.invoke('config:setServerUrl', url),
+  getTheme:       ()      => ipcRenderer.invoke('config:getTheme'),
+  setTheme:       (theme) => ipcRenderer.invoke('config:setTheme', theme),
+  getEulaAccepted: ()     => ipcRenderer.invoke('config:getEulaAccepted'),
+  setEulaAccepted: ()     => ipcRenderer.invoke('config:setEulaAccepted'),
 
   // Secure token storage (OS keychain)
   getToken:   ()      => ipcRenderer.invoke('token:get'),

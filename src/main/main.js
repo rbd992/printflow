@@ -11,6 +11,7 @@ const store = new Store({
     theme:        { type: 'string', default: 'dark', enum: ['dark', 'light', 'system'] },
     windowBounds: { type: 'object', default: { width: 1280, height: 800 } },
     lastUpdateCheck: { type: 'number', default: 0 },
+    eulaAccepted: { type: 'boolean', default: false },
   },
 });
 
@@ -177,6 +178,8 @@ function compareVersions(a, b) {
 // ── IPC Handlers ───────────────────────────────────────────────────
 ipcMain.handle('config:getServerUrl', () => store.get('serverUrl'));
 ipcMain.handle('config:setServerUrl', (_, url) => { store.set('serverUrl', url); return true; });
+ipcMain.handle('config:getEulaAccepted', () => store.get('eulaAccepted', false));
+ipcMain.handle('config:setEulaAccepted', () => { store.set('eulaAccepted', true); return true; });
 
 ipcMain.handle('config:getTheme', () => store.get('theme'));
 ipcMain.handle('config:setTheme', (_, theme) => {

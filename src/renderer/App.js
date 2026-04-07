@@ -27,6 +27,8 @@ import CustomersPage    from './pages/CustomersPage';
 import QuotePage        from './pages/QuotePage';
 import PrintHistoryPage from './pages/PrintHistoryPage';
 import HelpPage          from './pages/HelpPage';
+import EulaPage          from './pages/EulaPage';
+import OnboardingPage    from './pages/OnboardingPage';
 
 function AuthGuard({ children, roles }) {
   const { token, user } = useAuthStore();
@@ -48,7 +50,9 @@ function LoadingScreen() {
 
 export default function App() {
   const { isLoading, token, serverUrl, init } = useAuthStore();
-  const [theme, setTheme] = useState('dark');
+  const [theme, setTheme]           = useState('dark');
+  const [eulaAccepted, setEulaAccepted] = useState(null); // null = loading
+  const [onboardingDone, setOnboardingDone] = useState(null);
 
   useEffect(() => {
     async function bootstrap() {
@@ -58,13 +62,35 @@ export default function App() {
       document.documentElement.setAttribute('data-theme', t);
       await initApi();
       await init();
+      // Check EULA acceptance (stored in Electron, survives reinstalls if same user)
+      const eula = await window.printflow.getEulaAccepted();
+      setEulaAccepted(!!eula);
     }
     bootstrap();
   }, []);
 
   useEffect(() => { document.documentElement.setAttribute('data-theme', theme); }, [theme]);
 
-  if (isLoading) return <LoadingScreen />;
+  // Check server-side onboarding flag once logged in
+  useEffect(() => {
+    if (!token) return;
+    import('./api/client').then(({ settingsApi }) => {
+      settingsApi.get('onboarding_complete')
+        .then(r => setOnboardingDone(!!r.data?.value))
+        .catch(() => setOnboardingDone(true)); // fail open
+    });
+  }, [token]);
+
+  async function acceptEula() {
+    await window.printflow.setEulaAccepted();
+    setEulaAccepted(true);
+  }
+
+  if (isLoading || eulaAccepted === null) return <LoadingScreen />;
+
+  // Show EULA on first launch
+  if (!eulaAccepted) return <EulaPage onAccept={acceptEula} />;
+
   const needsSetup = !serverUrl;
 
   return (
@@ -72,10 +98,14 @@ export default function App() {
       <Routes>
         <Route path="/setup" element={<SetupPage />} />
         <Route path="/login" element={needsSetup ? <Navigate to="/setup" replace /> : <LoginPage />} />
+        <Route path="/onboarding" element={
+          !token ? <Navigate to="/login" replace /> : <OnboardingPage onComplete={() => setOnboardingDone(true)} />
+        } />
 
         <Route path="/" element={
           needsSetup ? <Navigate to="/setup" replace />
             : !token ? <Navigate to="/login" replace />
+            : (onboardingDone === false) ? <Navigate to="/onboarding" replace />
             : <AppShell theme={theme} onThemeChange={setTheme} />
         }>
           <Route index element={<Dashboard />} />
