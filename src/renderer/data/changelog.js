@@ -3,6 +3,26 @@
 
 export const CHANGELOG = [
   {
+    version: '1.1.2',
+    date: '2026-04-07',
+    title: 'Quotes & Invoices — Company Info Auto-populated from Settings',
+    highlights: [
+      'Quotes page now reads your business info directly from company settings',
+      'No more duplicate business info panel — update once in Settings, reflects everywhere',
+      'HST rate and enabled/disabled state now pulled from company config',
+      'Edit in Settings link shown directly on the Quotes page',
+    ],
+    changes: [
+      { type: 'fix',     text: 'Quotes — business info now loaded from company_config (set in onboarding and Settings) instead of a separate biz_info key' },
+      { type: 'fix',     text: 'Quotes — HST rate now uses the rate configured in Settings instead of hardcoded 13%' },
+      { type: 'fix',     text: 'Quotes — HST toggle respects the enable_hst flag from company settings; hides tax column entirely if disabled' },
+      { type: 'improve', text: 'Quotes — removed editable business info panel from the page; replaced with a read-only banner with an Edit in Settings link' },
+      { type: 'improve', text: 'Quotes — layout simplified to single column; PDF generation button appears at both top and bottom' },
+      { type: 'improve', text: 'Quotes — order fill dropdown now includes historical orders and excludes cancelled ones' },
+      { type: 'improve', text: 'Quotes — PDF template hides tax column entirely when HST is disabled; uses configured tax rate label' },
+    ],
+  },
+  {
     version: '1.1.1',
     date: '2026-04-07',
     title: 'EULA Polish, Onboarding Skip & Version Fix',
