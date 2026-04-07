@@ -3,6 +3,25 @@
 
 export const CHANGELOG = [
   {
+    version: '1.0.35',
+    date: '2026-04-07',
+    title: 'Help Center Polish — Professional Design & Printer-Agnostic Copy',
+    highlights: [
+      'Help page redesigned — all emojis replaced with clean SVG icons',
+      'PrintFlow overview updated to reflect multi-brand printer support',
+      'Numbered steps, improved content rendering, and professional tone throughout',
+    ],
+    changes: [
+      { type: 'improve', text: 'Help — all section icons replaced with SVG icons matching the sidebar design language' },
+      { type: 'improve', text: 'Help — What is PrintFlow updated to remove brand-specific references; positioned as printer-agnostic business suite' },
+      { type: 'improve', text: 'Help — numbered lists now render with styled step numbers instead of plain HTML ol' },
+      { type: 'improve', text: 'Help — bullet lists use em-dash styling consistent with app design' },
+      { type: 'improve', text: 'Help — code paths render in styled monospace blocks' },
+      { type: 'improve', text: 'Help — breadcrumb uses SVG icon matching section' },
+      { type: 'improve', text: 'Help — overall tone revised to professional documentation standard' },
+    ],
+  },
+  {
     version: '1.0.34',
     date: '2026-04-07',
     title: 'Help & Support Center',

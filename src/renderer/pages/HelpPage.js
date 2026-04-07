@@ -1,93 +1,162 @@
 import React, { useState } from 'react';
 import { CHANGELOG } from '../data/changelog';
 
-// ── Help content ────────────────────────────────────────────────────────────
+// ── Section icons (SVG, no emojis) ──────────────────────────────────────────
+const SectionIcon = ({ id }) => {
+  const icons = {
+    'getting-started': (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <polygon points="5 3 19 12 5 21 5 3"/>
+      </svg>
+    ),
+    'orders': (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M21 10V8a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-2"/>
+        <path d="M12 12H3"/><path d="M16 6V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/>
+        <circle cx="18" cy="12" r="3"/><path d="m22 16-2-2"/>
+      </svg>
+    ),
+    'finance': (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <line x1="12" y1="1" x2="12" y2="23"/>
+        <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+      </svg>
+    ),
+    'printers': (
+      <svg width="16" height="16" viewBox="0 0 80 80" fill="none">
+        <rect x="8" y="12" width="6" height="40" rx="3" fill="currentColor" opacity="0.5"/>
+        <rect x="66" y="12" width="6" height="40" rx="3" fill="currentColor" opacity="0.5"/>
+        <rect x="8" y="10" width="64" height="8" rx="4" fill="currentColor" opacity="0.65"/>
+        <rect x="31" y="12" width="18" height="11" rx="3" fill="currentColor"/>
+        <path d="M37 23 L40 30 L43 23 Z" fill="currentColor"/>
+        <rect x="27" y="48" width="26" height="5" rx="2" fill="currentColor" opacity="0.7"/>
+        <rect x="29" y="43" width="22" height="6" rx="2" fill="currentColor" opacity="0.55"/>
+        <rect x="10" y="57" width="60" height="8" rx="3" fill="currentColor" opacity="0.7"/>
+      </svg>
+    ),
+    'filament': (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3"/>
+      </svg>
+    ),
+    'customers': (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+        <circle cx="9" cy="7" r="4"/>
+        <path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+      </svg>
+    ),
+    'quotes': (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+        <polyline points="14 2 14 8 20 8"/>
+        <line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>
+      </svg>
+    ),
+    'settings': (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="12" cy="12" r="3"/>
+        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+      </svg>
+    ),
+    'troubleshooting': (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="12" cy="12" r="10"/>
+        <line x1="12" y1="8" x2="12" y2="12"/>
+        <line x1="12" y1="16" x2="12.01" y2="16"/>
+      </svg>
+    ),
+  };
+  return icons[id] || null;
+};
+
+// ── Help content ─────────────────────────────────────────────────────────────
 const SECTIONS = [
   {
     id: 'getting-started',
-    icon: '🚀',
     title: 'Getting Started',
     topics: [
       {
         id: 'overview',
         title: 'What is PrintFlow?',
-        content: `PrintFlow is a complete business management suite built specifically for Bambu Lab 3D printing operations. It runs on your Synology NAS and is accessible from any computer on your network — or remotely via Tailscale.
+        content: `PrintFlow is a complete business management suite built specifically for 3D printing operations. It runs on a local server (your NAS or any always-on machine) and is accessible from any computer on your network — or remotely over a VPN.
 
-PrintFlow handles the full lifecycle of your print business:
-• **Orders** — Track every order from new request to payment collected
-• **Printers** — Live dashboard for your Bambu Lab H2C and P1S
-• **Filament** — Inventory tracking with AMS sync and low-stock alerts
-• **Finance** — Revenue and expense reporting with monthly/yearly breakdowns
-• **Customers** — Full CRM with order history and spend analytics
-• **Job Queue** — Kanban board for managing print jobs in progress
+PrintFlow is printer-agnostic and designed to support any FDM, resin, or multi-material printer. It handles the full lifecycle of your print business:
 
-Everything syncs in real time across all users via the server on your NAS. Multiple team members can be logged in simultaneously with different permission levels.`,
+- **Orders** — Track every order from initial request through payment collected
+- **Printers** — Live dashboard monitoring with real-time status, temperatures, and progress
+- **Filament** — Inventory tracking with AMS sync, low-stock alerts, and cost analysis
+- **Finance** — Revenue and expense reporting with monthly and yearly breakdowns
+- **Customers** — Full CRM with order history, contact details, and spend analytics
+- **Job Queue** — Kanban board for managing active print jobs across all printers
+- **Quotes & Invoices** — Professional PDF documents for customers
+
+Everything syncs in real time across all connected users via the server. Multiple team members can be logged in simultaneously with different permission levels.`,
       },
       {
         id: 'roles',
         title: 'User Roles & Permissions',
-        content: `PrintFlow has three role levels:
+        content: `PrintFlow has three role levels that control what each user can see and do:
 
 **Owner**
-Full access to everything including:
-- All pages and features
-- User management (create/edit/delete accounts)
-- Delete orders, transactions, and data
+Full access to all features including:
+- All pages, reports, and data
+- User management — create, edit, and deactivate team accounts
+- Delete orders, transactions, and records permanently
 - Company settings and tax configuration
-- Finance and revenue reports
+- All financial reports and data exports
 
 **Manager**
-Business operations access:
-- Create and edit orders
-- View finance reports
-- Create quotes and invoices
-- Access customer data
-- Cannot delete orders or manage users
+Day-to-day business operations:
+- Create and edit orders, quotes, and invoices
+- View all financial reports and export data
+- Access and edit customer records
+- Cannot delete orders or manage user accounts
 
 **Operator**
-Production-focused access:
-- View orders and update status
-- View printer dashboard
-- Update job queue
-- Cannot access finance or customer data
+Production floor access:
+- View orders and update order status
+- View and update the live printer dashboard
+- Manage the job queue
+- Cannot access financial data, customer details, or settings
 
-To change a user's role, go to **Settings → Users** (Owner only).`,
+To manage user accounts and roles, go to **Settings → Users** (Owner only).`,
       },
       {
         id: 'navigation',
         title: 'Finding Your Way Around',
-        content: `The sidebar on the left is organized into four sections:
+        content: `The sidebar organizes navigation into four sections:
 
 **Work**
-- Dashboard — Business overview and live metrics
-- Orders — Customer orders and fulfilment pipeline
-- Job Queue — Active print jobs (Kanban board)
-- Print History — Log of all completed print jobs
-- Customers — Customer profiles and order history
-- Quotes & Invoices — Generate professional PDFs
+- Dashboard — Business overview with live metrics and recent activity
+- Orders — Full customer order pipeline from new to paid
+- Job Queue — Active print job tracking (Kanban board)
+- Print History — Complete log of all completed print jobs
+- Customers — Customer profiles with full order history
+- Quotes & Invoices — Generate professional PDF documents
 
 **Production**
-- Printers — Live Bambu Lab printer dashboard
-- Filament — Spool inventory and AMS tracking
-- Parts — Consumable parts and maintenance schedule
-- Models — MakerWorld and Printables browser
+- Printers — Live printer monitoring dashboard
+- Filament — Spool inventory and material tracking
+- Parts — Consumable parts and maintenance schedules
+- Models — In-app browser for MakerWorld and Printables
 
 **Business**
 - Finance — Revenue, expenses, and profit reporting
-- Shipping — Canada Post rate comparison
-- Marketing — Platform connections and social media
+- Shipping — Carrier rate comparison and label generation
+- Marketing — Platform connections and social channel management
 
 **System**
-- Settings — App preferences, company config, notifications
+- Settings — Company configuration, appearance, notifications
+- Help & Support — This guide
 - Users — Team account management (Owner only)
 
-**Keyboard shortcuts** — Cmd/Ctrl + 1 through 5 jump to Dashboard, Orders, Queue, Printers, and Filament.`,
+**Keyboard shortcuts:** Cmd/Ctrl + 1 through 5 navigate to Dashboard, Orders, Queue, Printers, and Filament instantly.`,
       },
     ],
   },
   {
     id: 'orders',
-    icon: '📦',
     title: 'Managing Orders',
     topics: [
       {
@@ -98,547 +167,548 @@ To change a user's role, go to **Settings → Users** (Owner only).`,
 1. Go to **Orders** in the sidebar
 2. Click **+ New Order** in the top right
 3. Fill in the required fields:
-   - **Customer Name** (required)
-   - **Platform/Source** — where the order came from (Etsy, Direct, Shopify, etc.)
+   - **Customer Name** — required
+   - **Platform / Source** — where the order came from (Etsy, Direct, Shopify, etc.)
    - **Description** — what the customer ordered
-   - **Price** — use the 🧮 calculator button to price based on filament cost, labour, and markup
-
-4. Set the **Order Date** — defaults to now, but you can backdate it
-5. Set the **Status** — defaults to "new"
+   - **Price** — enter manually or use the calculator button to price based on filament cost, labour, and markup
+4. Set the **Order Date** — defaults to the current date and time; can be backdated
+5. Set the **Status** — defaults to New
 6. Click **Create Order**
 
-The order is assigned an order number automatically (starting at #1001).`,
+The order is assigned an order number automatically, starting at #1001 and incrementing with each order.`,
       },
       {
         id: 'order-statuses',
         title: 'Order Status Pipeline',
-        content: `Orders move through a pipeline of statuses. Update the status by clicking the dropdown in the orders table or opening the order and changing it there.
+        content: `Orders move through a pipeline of statuses representing each stage of fulfilment. Update the status using the dropdown in the orders table, or by opening the order and changing it there.
 
 | Status | Meaning |
 |--------|---------|
-| **new** | Order received, not yet actioned |
-| **quoted** | Price quote sent to customer |
-| **confirmed** | Customer confirmed and approved |
-| **printing** | Currently on the printer |
-| **printed** | Print complete, not yet processed |
-| **post-processing** | Sanding, painting, assembly, etc. |
-| **packed** | Packaged and ready to ship |
-| **shipped** | Tracking number assigned, in transit |
-| **✅ Completed - Paid** | Payment received — revenue recorded |
-| **cancelled** | Order cancelled |
+| New | Order received, not yet actioned |
+| Quoted | Price estimate sent to the customer |
+| Confirmed | Customer has approved the quote |
+| Printing | Job is currently running on a printer |
+| Printed | Print complete, awaiting post-processing |
+| Post-Processing | Sanding, painting, assembly, or finishing |
+| Packed | Packaged and ready for pickup or shipment |
+| Shipped | Tracking number assigned, in transit |
+| Completed - Paid | Payment received and revenue recorded |
+| Cancelled | Order cancelled — any recorded revenue is reversed |
 
-**Important:** Revenue is only recorded when an order is marked **Completed - Paid**. Orders in any other status do not count toward your financial reports.`,
+**Revenue is only recorded when an order is marked Completed - Paid.** Orders in any other status do not count toward your financial reports, so your Finance page always reflects actual collected revenue.`,
       },
       {
         id: 'historical-orders',
         title: 'Importing Historical Orders',
-        content: `If you started using PrintFlow after already running your business, you can import past orders so your customer history and financial records are complete.
+        content: `If your business was operating before you started using PrintFlow, you can import past orders so your customer history and financial records are complete and accurate.
 
 To add a historical order:
 1. Click **+ New Order**
 2. Check the **Historical order import** checkbox at the top of the form
-3. Fill in the customer and order details
+3. Fill in the customer name, platform, description, and price
 4. Set the **Order Date** — when the order was originally placed
-5. Set the **Date Paid** — when you received payment (this is the date revenue will appear in Finance reporting)
+5. Set the **Date Paid** — when payment was received. This date determines which month the revenue appears in your Finance reports.
 6. Click **Create Order**
 
-Historical orders are automatically marked as paid and appear in the Finance page under the correct month based on their payment date. They are excluded from the "Active Orders" counter on the Dashboard since they're already complete.
+Historical orders are automatically marked as paid and appear in Finance reporting under the correct period based on their payment date. They are excluded from the Dashboard active order counter since they are already complete.
 
-**Tip:** To see historical/completed orders in the Orders page, click the **Show completed (X)** toggle in the filter bar.`,
+To view historical orders in the Orders page, enable the **Show completed** toggle in the filter bar.`,
       },
       {
         id: 'backdating',
-        title: 'Backdating Orders & Payment Dates',
-        content: `You can backdate both when an order was placed and when it was paid. This is useful for:
-- Orders you forgot to enter at the time
-- Historical imports from before PrintFlow
-- Correcting an entry made on the wrong date
+        title: 'Backdating Orders and Payment Dates',
+        content: `Both the order placement date and the payment date can be set to any date in the past. This is useful for:
 
-**Order Date** — sets when the order was placed (affects the "Order Date" column and sorting). This field is always editable and defaults to the current date/time.
+- Orders that were received before PrintFlow was in use
+- Orders entered late that should reflect their actual date
+- Correcting a date that was entered incorrectly
 
-**Date Paid** — only appears when status is set to "Completed - Paid" or the Historical import checkbox is checked. This sets the exact date the revenue transaction is recorded. If you set this to a past month, the revenue will appear in that month's Finance report — not the current month.
+**Order Date** — sets when the order was placed. This affects sorting and the Order Date column. Always visible in the order form, defaults to the current date and time.
 
-This means your Finance reports always reflect actual payment dates, not entry dates.`,
+**Date Paid** — sets the exact date that revenue is recorded in Finance. Only shown when status is set to Completed - Paid or the Historical import option is checked. Defaults to the current date and time when Completed - Paid is selected.
+
+If you set the payment date to a prior month, that revenue appears in that month's Finance report — not the current month. This ensures your reports reflect when money was actually received.`,
       },
       {
         id: 'completed-orders',
-        title: 'Viewing Completed & Past Orders',
-        content: `By default, the Orders page only shows active orders (everything except Paid and Cancelled) to keep the view clean.
+        title: 'Viewing Completed and Past Orders',
+        content: `The Orders page shows only active orders by default to keep the view focused on work in progress. Paid and cancelled orders are hidden unless you choose to show them.
 
-To see completed or cancelled orders:
-- Click the **Show completed (X)** toggle in the filter bar — the number shows how many completed orders exist
+**To view completed orders:**
+Click the **Show completed (X)** checkbox in the filter bar — the count shows how many completed orders exist.
 
-You can also filter by a specific status using the status dropdown to see only "paid" or only "cancelled" orders.
+**To filter by a specific status:**
+Use the Status dropdown. Selecting "paid" or "cancelled" will show those orders regardless of the Show Completed toggle.
 
-Completed orders can still be opened, viewed, and their details edited if needed. Only owners can delete orders permanently.`,
+**To view or edit a completed order:**
+Click any row to open the order detail modal. All fields remain visible. Owners can delete orders permanently from within this modal.
+
+Completed orders remain linked to customers and Finance records — deleting an order also deletes its associated revenue transaction.`,
       },
     ],
   },
   {
     id: 'finance',
-    icon: '💰',
     title: 'Finance & Reporting',
     topics: [
       {
         id: 'how-revenue-works',
         title: 'How Revenue Is Tracked',
-        content: `Revenue in PrintFlow is tracked through **transactions**, which are created automatically when an order is marked as paid. This means:
+        content: `Revenue in PrintFlow is tracked through transactions, which are created automatically when an order reaches Completed - Paid status. This means:
 
-✅ **Revenue IS recorded when:**
-- An order is set to "Completed - Paid" status
-- A historical order is imported (transaction dated to the payment date you set)
+Revenue is recorded when:
+- An order is set to Completed - Paid status
+- A historical order is imported (transaction is dated to the payment date you specify)
 
-❌ **Revenue is NOT recorded when:**
-- An order is created (even with a price)
-- An order is in any status other than paid (new, printing, shipped, etc.)
-- An order is cancelled (any existing transaction is reversed)
+Revenue is not recorded when:
+- An order is created, even with a price set
+- An order is in any other status — New, Printing, Shipped, etc.
+- An order is cancelled (any existing revenue transaction is automatically reversed)
 
-This design ensures your Finance reports show actual collected revenue — not projected or potential revenue from open orders.
+This ensures your Finance reports show only confirmed, collected revenue — not projected revenue from open or in-progress orders.
 
-Expenses are added manually via the **＋ Add Entry** button on the Finance page.`,
+Expenses are added manually using the **Add Entry** button on the Finance page.`,
       },
       {
         id: 'finance-views',
         title: 'Finance Report Views',
-        content: `The Finance page has three views:
+        content: `The Finance page has three reporting views:
 
 **Overview**
-- All-time totals: revenue, expenses, profit, margin percentage
-- Last 12 months bar chart (revenue vs expenses)
-- Expense breakdown pie chart by category
-- Full transaction ledger (most recent 100)
+- All-time totals: revenue, expenses, profit, and margin percentage
+- Last 12 months bar chart showing revenue vs expenses side by side
+- Expense breakdown chart by category
+- Full transaction ledger showing the 100 most recent entries
 
 **Monthly**
-- Pick any year and month from the droppers
-- Revenue, expenses, profit, and margin for that specific month
-- All transactions in that month listed below
+- Select any year and month using the pickers
+- Revenue, expenses, profit, and margin for that specific period
+- All transactions within that period listed in a table
 - Export that month's transactions to CSV
 
 **Yearly**
-- Pick any year
+- Select any year
 - Full year totals at the top
-- Month-by-month bar chart for the year
-- Monthly summary table — click any month row to drill into it
-- Export the full year's transactions to CSV
+- Month-by-month bar chart for the selected year
+- Monthly summary table — click any month row to drill directly into it
+- Export the complete year's transactions to CSV
 
-All views include a CSV export button. Transaction dates are based on the payment date, so backdated orders always appear in the correct reporting period.`,
+All views include a CSV export. Transaction dates are based on the payment date, so backdated orders always appear in the correct reporting period regardless of when they were entered.`,
       },
       {
         id: 'hst',
-        title: 'HST / Tax Settings',
-        content: `PrintFlow can automatically calculate and track HST (or any sales tax) on your income transactions.
+        title: 'Tax Configuration (HST / GST)',
+        content: `PrintFlow tracks HST or any applicable sales tax on income transactions automatically.
 
-To configure tax settings:
+To configure your tax settings:
 1. Go to **Settings**
-2. Scroll to the **Company Configuration** section
-3. Under **Tax & Finance**:
-   - Toggle **Enable Tax (HST/GST)** on or off
-   - Set your **Tax Rate** (default 13% for Ontario HST)
-   - Enter your **HST / GST Number** for invoicing
+2. Scroll to **Company Configuration**
+3. Under the Tax & Finance section:
+   - Toggle **Enable Tax** on or off
+   - Set your **Tax Rate** (13% for Ontario HST, 5% for federal GST only, etc.)
+   - Enter your **HST / GST Registration Number** for invoicing
    - Set your **Fiscal Year Start** month
 
-When HST is enabled, each income transaction records both the revenue amount and the HST amount separately. When disabled, HST is recorded as $0.
+When tax is enabled, each income transaction records the revenue amount and the tax amount separately. This makes it straightforward to calculate your net revenue and remittance obligations.
 
-**Note:** Changes to tax settings only affect new transactions going forward. Existing transactions retain the HST amount they were created with.`,
+When tax is disabled, the tax amount on all new transactions is recorded as zero.
+
+Note: Changes to tax settings apply to new transactions only. Existing transactions retain the tax amount they were created with.`,
       },
       {
         id: 'manual-transactions',
         title: 'Adding Manual Transactions',
-        content: `You can manually add any income or expense transaction that isn't tied to an order — supplies, shipping costs, platform fees, equipment, etc.
+        content: `You can manually record any income or expense that is not tied to a customer order — supply purchases, shipping costs, platform fees, equipment, and so on.
 
 1. Go to **Finance**
-2. Click **＋ Add Entry**
-3. Set the **Date**, **Type** (income or expense), **Description**, **Category**, and **Amount**
+2. Click **Add Entry**
+3. Set the date, type (income or expense), description, category, and amount
 4. Click **Add**
 
-**Expense categories:**
-- **Materials** — filament, resin, adhesives
-- **Shipping** — postage, packaging
-- **Fees** — Etsy fees, PayPal fees, platform commissions
-- **Maintenance** — printer parts, lubricants, tools
-- **Other** — anything that doesn't fit above
+Available expense categories:
+- **Materials** — filament, resin, adhesives, build plates
+- **Shipping** — postage and packaging supplies
+- **Fees** — platform commissions, payment processing fees, marketplace charges
+- **Maintenance** — printer parts, lubricants, replacement components, tools
+- **Other** — any expense that does not fit the categories above
 
-Manual transactions appear immediately in all Finance views under the date you entered.`,
+Manual transactions appear immediately in all Finance views under the date you entered and are included in CSV exports.`,
       },
     ],
   },
   {
     id: 'printers',
-    icon: '🖨️',
     title: 'Printers & Camera',
     topics: [
       {
         id: 'printer-dashboard',
         title: 'Live Printer Dashboard',
-        content: `The Printers page shows a live card for each of your registered Bambu Lab printers. Each card displays:
+        content: `The Printers page displays a live card for each registered printer. Each card shows:
 
-- **Print status** — idle, printing, paused, error
-- **Progress bar** — percentage complete and estimated time remaining
-- **Temperatures** — nozzle and bed current vs target temperature
-- **AMS trays** — which filament is loaded in each slot
-- **Current file name** — what's being printed
-- **Layer information** — current layer out of total layers
+- **Status** — idle, printing, paused, or error
+- **Progress** — percentage complete and estimated time remaining
+- **Temperatures** — current and target temperatures for the nozzle and bed
+- **AMS / Material** — which filament or material is loaded
+- **Current file** — the name of the file being printed
+- **Layer count** — current layer out of total layers
 
-The dashboard connects via **LAN Mode** (direct MQTT connection on your local network) for the fastest possible updates. Bambu Cloud mode is also supported for remote monitoring.
+The dashboard connects via the printer's local network API for direct, fast updates. Data refreshes automatically — no manual refresh is required.
 
-Data refreshes automatically — no manual refresh needed.`,
+Printers that go offline will show a disconnected state and reconnect automatically when they come back online.`,
       },
       {
         id: 'camera',
         title: 'Camera Feed',
-        content: `Each printer card has a camera button to view the live feed. Click the camera icon (📷) on any printer card to start streaming.
+        content: `Each printer card supports a live camera feed. Click the camera icon on any printer card to begin streaming.
 
 **Controls:**
-- **Start** — begins the MJPEG stream from the printer's built-in camera
-- **Stop** — ends the stream and releases the connection
-- **⊶ Popout** — opens the camera in a separate floating window so you can keep watching while using other pages
-- **Frame counter** — shows frames received next to the LIVE badge
+- **Start** — begins the live MJPEG stream from the printer's camera
+- **Stop** — ends the stream and releases the connection on the server
+- **Popout** — opens the camera in a separate floating window so you can monitor it while using other pages
+- **Frame counter** — displays the number of frames received next to the live indicator
 
-**If the camera won't connect:**
-- Make sure the printer is on and connected to your network
-- Check that the camera IP and access code are correct in the printer's settings (edit via the pencil icon on the card)
-- The camera requires the app to be connected to your NAS server on the local network — remote Tailscale connections may not support camera streaming
+**Troubleshooting the camera:**
+- The camera requires a local network connection — it will not function over a remote connection
+- Verify the camera IP address and access code are correct via the edit button on the printer card
+- If the stream freezes, click Stop and then restart it — the connection resets cleanly
+- If the popout window was previously open, close it before restarting the card stream
 
-**Camera settings** are configured per printer — the camera IP can be different from the printer IP if needed.`,
+Camera credentials are configured per-printer and can be set independently from the printer's main IP and access code.`,
       },
       {
         id: 'add-printer',
-        title: 'Adding & Editing Printers',
+        title: 'Adding and Editing Printers',
         content: `**To add a new printer:**
 1. Go to **Printers**
 2. Click **+ Add Printer**
 3. Enter:
-   - **Name** — a friendly label (e.g. "H2C Studio", "P1S Workshop")
-   - **Model** — select your Bambu Lab model
-   - **Serial Number** — found in the Bambu Handy app or on the printer
-   - **IP Address** — your printer's local IP (check your router or Bambu app)
-   - **Access Code** — the 8-character LAN access code shown on the printer's screen
-4. Optionally add AMS count and camera settings
+   - **Name** — a label to identify this printer (e.g. "Workshop P1S", "Studio Unit 2")
+   - **Model** — select the printer model from the list
+   - **Serial Number** — found in your printer's app or on the device label
+   - **IP Address** — the printer's current local IP address (check your router's device list)
+   - **Access Code** — the 8-character LAN access code displayed on the printer
+4. Optionally configure AMS slot count and camera settings
 5. Click **Register Printer**
 
 **To edit an existing printer:**
-Click the pencil ✏️ icon on any printer card. You can update the IP, access code, camera settings, and AMS configuration without removing and re-adding the printer.
+Click the pencil icon on any printer card. You can update the name, IP address, access code, camera settings, and AMS configuration without removing and re-adding the printer.
 
-**Finding your access code:**
-On the printer's touchscreen, go to **Settings → Network → LAN Mode Access Code**.`,
+**Finding the LAN access code:**
+The access code is typically found in the printer's network settings under LAN Mode. Refer to your printer's documentation for the specific location.`,
       },
     ],
   },
   {
     id: 'filament',
-    icon: '🧵',
     title: 'Filament Inventory',
     topics: [
       {
         id: 'adding-spools',
         title: 'Adding Filament Spools',
-        content: `**From the Bambu Lab catalogue:**
+        content: `**From a vendor catalogue:**
 1. Go to **Filament**
-2. Click the **Bambu Lab** tab (or another vendor tab)
+2. Select a vendor tab (Bambu Lab, Polymaker, Sunlu, Overture, etc.)
 3. Browse or search for your filament
-4. Click **Add to Inventory** — the cost and specs are pre-filled from the catalogue
+4. Click **Add to Inventory** — cost and specifications are pre-filled from the catalogue
 
 **Adding a custom spool:**
-1. Click the **Custom** tab
-2. Fill in brand, material, color, weight, and cost
+1. Select the **Custom** tab
+2. Enter brand, material, color, weight, cost, and any other relevant details
 3. Click **Add Spool**
 
-**Spool details you can track:**
-- Remaining grams (updated automatically via AMS sync)
-- Cost per spool (used in the price calculator)
-- Reorder threshold — get a low-stock alert when remaining drops below this
-- Vendor and bambu tag UID for AMS matching
+**Information tracked per spool:**
+- Remaining weight in grams (updated via AMS sync when connected printers report tray data)
+- Purchase cost (used by the price calculator for accurate job costing)
+- Reorder threshold — triggers a low-stock indicator when remaining grams fall below this level
+- Vendor source for reordering reference
 
-**AMS sync:** When your printers report AMS tray data, the filament inventory automatically updates the remaining weight for matched spools.`,
+**AMS synchronization:**
+When connected printers report AMS tray readings, PrintFlow automatically updates the remaining weight for matched spools in your inventory.`,
       },
       {
         id: 'price-calculator',
         title: 'Using the Price Calculator',
-        content: `The price calculator helps you price orders based on real costs. Access it in the New/Edit Order form by clicking the **🧮** button next to the price field.
+        content: `The price calculator helps you set accurate, profitable prices based on your actual material and labour costs. Access it in any order form by clicking the calculator button next to the price field.
 
-**Inputs:**
-- **Filament Material** — selects which spools to use for cost averaging
-- **Estimated Grams** — how much filament the print uses (from your slicer)
-- **Labour Hours** — time spent on prep, post-processing, packing
-- **Labour Rate** — your hourly rate ($/hr)
-- **Post-Processing** — fixed cost for sanding, painting, assembly
-- **Markup %** — profit margin percentage applied to all costs
-- **Include HST** — adds 13% Ontario HST to the final price
+**Input fields:**
+- **Filament Material** — selects which inventory spools to use for cost averaging
+- **Estimated Grams** — the amount of filament the print uses (available from your slicer)
+- **Labour Hours** — time spent on preparation, post-processing, packing, and handling
+- **Labour Rate** — your hourly rate
+- **Post-Processing** — any fixed costs for additional finishing steps
+- **Markup Percentage** — profit margin applied to the total cost
+- **Include Tax** — adds the applicable tax rate to the final price
 
-**How costs are calculated:**
-The filament cost is based on the average cost-per-gram of all spools of that material in your inventory that have a cost set. If no spools have cost data, it defaults to $25/kg.
+**How filament cost is determined:**
+The calculator uses the average cost-per-gram across all spools of the selected material in your inventory that have a purchase cost recorded. If no spools have cost data, a default estimate is used.
 
-Click **Apply $X.XX to Order** to use the calculated price.`,
+Click **Apply to Order** to set the calculated amount as the order price.`,
       },
     ],
   },
   {
     id: 'customers',
-    icon: '👥',
     title: 'Customer Management',
     topics: [
       {
         id: 'customer-profiles',
         title: 'Customer Profiles',
-        content: `The Customers page automatically builds customer profiles from your order history — no manual entry required. Every customer who has placed an order appears here automatically.
+        content: `The Customers page builds customer profiles automatically from your order history. Every customer who has an order in the system appears here without any manual entry required.
 
-**Each profile shows:**
-- Total orders placed
+Each profile displays:
+- Total number of orders
 - Total amount spent
 - Average order value
-- First and most recent order date
-- ★ Repeat buyer badge (2+ orders)
+- Date of first and most recent order
+- Repeat buyer indicator for customers with two or more orders
 
-**Click any customer** to open their detail panel on the right, showing full order history with status and amounts.
+Click any customer row to open a detail panel on the right side of the screen. The panel shows the complete order history for that customer with status and amounts for each order.
 
-**Manual customer records** can be added via **+ Add Customer** if you want to store contact details, address, or notes before they've placed an order. Manual records merge automatically with order-derived data when orders are matched by email or name.`,
+Manual customer records can be added using the **Add Customer** button if you want to store contact details before a customer has placed an order. Manual records merge automatically with order data when orders are matched by email address or name.`,
       },
       {
         id: 'customer-data',
         title: 'Storing Customer Information',
-        content: `To add or edit customer contact details:
+        content: `To add or edit contact information for a customer:
 
-1. Click any customer in the list
-2. Click **Edit Customer** (or **Save** for order-only customers)
-3. You can store:
-   - Full name and email
+1. Click the customer in the list
+2. Click **Edit Customer** in the detail panel (or **Save** for order-only entries)
+3. Fields available:
+   - Full name and email address
    - Phone number
-   - Full mailing address (for shipping labels)
-   - Tags (e.g. "vip", "wholesale", "repeat")
-   - Notes (allergies, preferences, special instructions)
+   - Full mailing address — useful for generating shipping labels
+   - Tags — short labels such as "wholesale", "repeat", or "vip"
+   - Notes — any relevant information about preferences, requirements, or history
 
-Tags and notes appear in the customer detail panel and can help you remember important details when fulfilling repeat orders.
+Tags appear in the customer list and can help you identify priority customers at a glance. Notes are visible in the detail panel when viewing a customer.
 
-Customer data is stored on your NAS server and shared across all users.`,
+Customer data is stored on your server and is accessible to all users with sufficient permissions.`,
       },
     ],
   },
   {
     id: 'quotes',
-    icon: '🧾',
     title: 'Quotes & Invoices',
     topics: [
       {
         id: 'creating-quotes',
         title: 'Creating a Quote or Invoice',
-        content: `The Quotes & Invoices page generates professional PDF documents you can send to customers.
+        content: `The Quotes & Invoices page generates professional PDF documents you can send directly to customers.
 
-**To create a quote:**
+**To create a document:**
 1. Go to **Quotes & Invoices**
-2. Fill in your business info (saved automatically for next time)
-3. Fill in the customer details, or use **Fill from Customer** to pull from your customer database
-4. Add line items — each with description, quantity, and unit price
-5. Toggle HST on/off as needed
-6. Click **Print / Save PDF** to generate the document
+2. Your business information is pre-filled from company settings
+3. Enter the customer details, or click **Fill from Customer** to pull from your customer database
+4. Add line items — each with a description, quantity, and unit price
+5. Toggle tax on or off for this document
+6. Set the document title to "Quote" or "Invoice" as appropriate
+7. Click **Print / Save PDF** to generate the document
 
 **Quote vs Invoice:**
-- Use "Quote" for estimates before work begins
-- Use "Invoice" for final billing after work is complete
-- Change the document title in the header field
+A quote is an estimate sent before work begins. An invoice is the final billing document issued after the work is complete. The document title can be changed freely to suit either purpose.
 
-**Your business info** (name, address, HST number, email) is saved to the server so it pre-fills automatically every time you open this page.`,
+Your business name, address, registration number, and contact information are saved automatically from your company settings and pre-fill on every new document.`,
       },
     ],
   },
   {
     id: 'settings',
-    icon: '⚙️',
     title: 'Settings & Configuration',
     topics: [
       {
         id: 'company-settings',
         title: 'Company Configuration',
-        content: `Set up your business details in **Settings → Company Configuration**. This information is used on quotes, invoices, and financial reports.
+        content: `Your business details are configured in **Settings → Company Configuration** and are used across quotes, invoices, and financial reports.
 
-**Business Info:**
-- Company name, email, phone, website
-- Street address, city, province, postal code
+**Business Information:**
+- Company name, email address, phone number, and website
+- Full mailing address including city, province, and postal code
 
 **Tax & Finance:**
-- **Enable Tax** — toggle HST/GST on or off for all new transactions
-- **Tax Rate** — your applicable rate (13% for Ontario HST, 5% for federal GST only, etc.)
-- **HST/GST Number** — your CRA registration number, printed on invoices
-- **Fiscal Year Start** — which month your fiscal year begins (affects some report groupings)
+- **Enable Tax** — toggle sales tax calculation on or off for all new transactions
+- **Tax Rate** — your applicable rate expressed as a percentage
+- **Tax Registration Number** — your government-issued registration number, printed on invoices
+- **Fiscal Year Start** — the month your fiscal year begins
 
-Click **Save Company** to store your settings. They are saved to the server and shared across all users.`,
+All settings are saved to the server and shared across all users. Click **Save Company** to apply any changes.`,
       },
       {
         id: 'notifications',
-        title: 'Push Notifications (ntfy)',
-        content: `PrintFlow can send push notifications to your phone when prints complete or fail, using the free **ntfy.sh** service.
+        title: 'Push Notifications',
+        content: `PrintFlow can send push notifications to your phone or other devices when print jobs complete or encounter errors. This is handled through ntfy, a free and open-source notification service.
 
 **Setup:**
-1. Install the **ntfy** app on your phone (iOS or Android — search "ntfy" in the app store)
-2. Go to **Settings → Push Notifications** in PrintFlow
-3. Enter a unique topic name (e.g. "alliston3dprints-rob") — this is your private channel
-4. Subscribe to that same topic name in the ntfy app on your phone
-5. Toggle **Enable push notifications** on
-6. Click **Save**, then **🔔 Send Test** to verify it works
+1. Install the ntfy app on your phone — available on iOS and Android
+2. In PrintFlow, go to **Settings → Push Notifications**
+3. Enter a unique topic name — this is your private notification channel
+4. Open the ntfy app on your phone and subscribe to the same topic name
+5. Enable the toggle and click Save
+6. Click **Send Test** to confirm the connection is working
 
-Notifications are sent when print jobs complete or encounter errors. The topic name acts as your private channel — choose something unique so others can't subscribe to it.`,
+The topic name acts as your private channel identifier. Choose something unique and non-obvious so that only your devices receive your notifications.
+
+Notifications are sent automatically when print jobs complete, fail, or encounter errors.`,
       },
       {
         id: 'server-connection',
         title: 'Server Connection & Remote Access',
-        content: `PrintFlow connects to a server running on your Synology NAS. The app automatically tries your local IP first, then falls back to Tailscale for remote access.
+        content: `PrintFlow connects to a backend server that manages the database and API. The app automatically detects whether you are on the local network or connecting remotely.
 
-**Local access (home network):**
-Server runs at \`http://10.0.0.219:3001\` by default. This is the fast path — all features including camera streaming work over LAN.
+**Local network access:**
+When you are on the same network as the server, the app connects directly using the server's local IP address. This provides the fastest response times and supports all features including camera streaming.
 
-**Remote access (Tailscale):**
-Install Tailscale on your phone or laptop, join your tailnet, and the app will automatically connect via \`http://100.68.105.76:3001\`. Most features work remotely except camera streaming (which requires LAN).
+**Remote access:**
+PrintFlow supports remote access via Tailscale, a zero-configuration VPN service. With Tailscale installed on your device and the server, you can connect from anywhere. Most features work remotely; camera streaming requires a local connection.
 
 **Changing the server URL:**
-Settings → Server Connection → update the URL and click Save. Restart the app after changing.
+Go to **Settings → Server Connection**, update the URL, and click Save. Restart the app after making this change.
 
-**If you can't connect:**
-- Make sure the NAS is on and the PrintFlow container is running (check DSM → Container Manager)
-- Check that port 3001 is not blocked by your firewall
-- Try manually entering the server URL in Settings`,
+**If the connection fails:**
+- Confirm the server is running (check your NAS container manager or equivalent)
+- Verify the server IP and port are correct
+- If using remote access, confirm your VPN connection is active`,
       },
       {
         id: 'updates',
         title: 'Keeping PrintFlow Updated',
-        content: `PrintFlow checks for updates automatically when the app starts. If a new version is available, a blue banner appears in the bottom-left of the sidebar.
+        content: `PrintFlow checks for updates automatically when the app starts. When a newer version is available, a notification banner appears in the lower-left corner of the sidebar.
 
-**To update:**
-1. Click **↓ Download** in the update banner
-2. The new installer downloads automatically
-3. Run the installer — it replaces the old version in place
-4. Reopen PrintFlow
+**To update the app:**
+1. Click the Download button in the update notification
+2. The installer downloads to your computer
+3. Run the installer — it replaces the existing version
+4. Relaunch PrintFlow
 
 **PrintFlow has two components that update separately:**
 
-**The Electron app (this app)** — updates via the installer download above. Contains all the pages and UI.
+**The desktop app** — this application, which contains all pages and the user interface. Updated by downloading and running the new installer.
 
-**The server (on your NAS)** — updates via DSM Task Scheduler running "PrintFlow Deploy". This updates the Docker container that handles the database and API. Run this after major updates.
+**The server** — runs on your NAS or server machine and handles the database, API, and printer connections. Updated by running the deployment task in your server management interface after a new version is pushed.
 
-**Checking your version:**
-Your current version is shown in the sidebar footer (e.g. v1.0.33 · owner) and on the login screen.
-
-Check the full release notes by clicking the **ⓘ** button in the sidebar footer.`,
+Both components should be kept at the same version for full compatibility. Your current version is shown in the sidebar footer and on the login screen.`,
       },
     ],
   },
   {
     id: 'troubleshooting',
-    icon: '🔧',
     title: 'Troubleshooting',
     topics: [
       {
         id: 'cant-connect',
-        title: "Can't Connect to Server",
-        content: `If PrintFlow shows a connection error at startup:
+        title: 'Cannot Connect to Server',
+        content: `If PrintFlow displays a connection error at startup or cannot reach the server:
 
-**1. Check the NAS is running**
-Open DSM and make sure the NAS is online and responsive.
+**1. Verify the server is running**
+Check your server management interface (NAS container manager or equivalent) and confirm the PrintFlow server container is in a running state. If it has stopped, start it and wait about 30 seconds before trying again.
 
-**2. Check the container is running**
-In DSM → Container Manager, find the "printflow-server" container. It should show as "Running". If not, start it.
+**2. Test the server directly**
+Open a browser and navigate to `http://[your-server-ip]:3001/health`. A brief JSON response confirms the server is accepting connections. If nothing loads, the server is not responding on that port.
 
-**3. Check port 3001**
-Open a browser and go to \`http://10.0.0.219:3001/health\`. You should see a JSON response. If not, the server isn't responding on that port.
+**3. Check your network**
+Confirm your computer is on the same network as the server, or that your remote access connection is active if you are connecting from outside the network.
 
-**4. Check your network**
-If you're away from home, make sure Tailscale is connected on your device. The app will automatically try the Tailscale IP.
+**4. Verify the server address**
+Go to **Settings → Server Connection** and confirm the URL is correct, including the port number. An incorrect IP address or port is a common cause of connection failures.
 
-**5. Manually set the server URL**
-If auto-detect fails, go to Settings (if you can get in) or click "Change server" on the login page to manually enter the URL.`,
+**5. Restart the server**
+A container restart often resolves unexpected connectivity issues. After restarting, allow 20 to 30 seconds for the server to fully initialize before attempting to connect.`,
       },
       {
         id: 'orders-not-showing',
-        title: 'Orders Not Appearing in Finance',
-        content: `If an order isn't showing up in Finance reports:
+        title: 'Order Not Appearing in Finance',
+        content: `If an order is not appearing in Finance reports, work through the following checks:
 
-**Check the order status**
-Only orders with status **"Completed - Paid"** create a financial transaction. Orders that are new, printing, shipped, etc. do not count as revenue until marked paid.
+**Verify the order status**
+Only orders with the status Completed - Paid create a financial transaction. Orders in any other status — including New, Printing, Shipped, or Post-Processing — do not appear in Finance until marked as paid.
 
-**Check the transaction date**
-The revenue appears in the month of the **payment date** (Date Paid), not the order date. If you set the payment date to a past month, look in that month's Finance report.
+**Check the payment date**
+Revenue is recorded under the month of the payment date, not the order creation date. If you set a payment date in a prior month, the revenue appears in that month's report. Check the correct period in the Monthly or Yearly view.
 
-**Check if it's historical**
-Historical orders are included in Finance but appear under their payment date. Use the **Yearly** view and look at the correct year.
+**Check historical orders**
+Historical orders are included in Finance reporting and appear under their specified payment date. Use the Yearly view and select the appropriate year to locate them.
 
-**No transaction was created**
-This can happen if the order was created before the payment tracking feature was deployed. In this case the order exists but has no linked transaction. Contact support or check the database directly.`,
+**Confirm a transaction was created**
+It is possible for an order to exist without a linked transaction if it was created before the payment tracking feature was introduced. In this case, the order will show a paid status but will not appear in Finance. Contact support with the order number to resolve this.`,
       },
       {
         id: 'camera-not-working',
         title: 'Camera Feed Not Working',
-        content: `If the camera won't start or shows an error:
+        content: `If the camera stream fails to start or displays an error:
 
-**1. Make sure you're on the local network**
-Camera streaming requires LAN access. It will not work over Tailscale (remote connection). Make sure the app is connected via your local IP (10.0.0.x).
+**1. Confirm you are on the local network**
+Camera streaming requires a direct local network connection. It will not function over a remote connection. Verify the app is connected via the local server IP address.
 
 **2. Check the camera credentials**
-Click the ✏️ pencil on the printer card → check the camera IP and access code are correct. The access code is the same 8-character code used for LAN mode.
+Click the edit button on the printer card and verify the camera IP address and access code. The access code is typically the same as the printer's LAN access code.
 
-**3. Try stopping and restarting**
-Click Stop, wait a moment, then click the camera icon again. The stream will restart fresh.
+**3. Restart the stream**
+Click Stop, wait a moment for the connection to fully close, then click the camera icon again to restart. This clears any stale connection on the server side.
 
-**4. Check the printer is on and connected**
-The camera only streams when the printer is powered on and connected to your network.
+**4. Confirm the printer is powered on**
+The camera can only stream when the printer is turned on and connected to the network. A printer in sleep mode or powered off will not respond.
 
-**5. Close the popout if open**
-If you previously opened the popout window and it's still open, close it before trying to restart the card stream.`,
+**5. Close any open popout window**
+If the camera popout window was previously opened and left open, close it before attempting to restart the main card stream.`,
       },
       {
         id: 'printer-offline',
-        title: 'Printer Shows Offline',
-        content: `If a printer card shows "Offline" or won't connect:
+        title: 'Printer Shows as Offline',
+        content: `If a printer card shows an offline or disconnected status:
 
-**1. Check the printer is on**
-The printer must be powered on and not in sleep mode.
+**1. Confirm the printer is powered on**
+The printer must be on and not in an idle sleep state that disables network access.
 
-**2. Verify the IP address**
-Printer IPs can change if assigned by DHCP. Check the current IP on the printer's touchscreen under Settings → Network, or check your router's device list. Update it via the ✏️ edit button on the card.
+**2. Verify the IP address is current**
+Printer IP addresses can change if assigned automatically by your router. Check the current IP address in the printer's network settings or your router's connected device list. Update the IP in PrintFlow using the edit button on the printer card.
 
-**3. Check LAN Mode is enabled**
-On the printer touchscreen: Settings → Network → LAN Mode must be enabled.
+**3. Confirm network mode is enabled**
+The printer must have its local network or LAN mode enabled for PrintFlow to connect. Check the printer's network settings and enable this mode if it is not already active.
 
-**4. Verify the access code**
-The LAN access code is shown on the printer's screen under Settings → Network → LAN Mode Access Code. It occasionally changes.
+**4. Check the access code**
+The LAN access code may have changed, particularly after a firmware update. Locate the current code in the printer's network settings and update it in PrintFlow.
 
 **5. Restart the printer**
-A full power cycle often resolves connection issues.`,
+A full power cycle — turning the printer completely off, waiting 10 seconds, and turning it back on — resolves the majority of connectivity issues.`,
       },
       {
         id: 'getting-help',
-        title: 'Getting Further Help',
-        content: `PrintFlow is actively developed. If you encounter an issue not covered here:
+        title: 'Getting Further Assistance',
+        content: `If you encounter an issue not covered in this guide:
 
-**Check the Release Notes**
-Click the **ⓘ** button in the sidebar footer to see the full changelog. Recent fixes may address your issue.
+**Review the release notes**
+Click the information button in the sidebar footer to open the full release notes. Recent updates may include fixes for the issue you are experiencing.
 
-**Check the server logs**
-The server logs at \`\\\\Synology\\printflow1\\logs\\combined.log\` contain detailed error information that can help diagnose server-side issues.
+**Check the server log**
+The server writes detailed logs that can help identify the source of a problem. The log file is located at:
 
-**Common log locations:**
-- Server logs: \`\\\\Synology\\printflow1\\logs\\combined.log\`
-- Database: \`\\\\Synology\\printflow1\\data\\printflow.db\`
+`\\Synology\printflow1\logs\combined.log`
 
-**Reporting a bug:**
-Note down:
-1. What you were trying to do
-2. What happened instead
-3. Your PrintFlow version (shown in sidebar footer)
-4. Any error messages shown
+Look for entries marked as "error" near the time the issue occurred.
 
-PrintFlow version: shown in the sidebar footer and login screen.`,
+**Information to gather before reporting an issue:**
+- Your current PrintFlow version (visible in the sidebar footer)
+- A description of what you were doing when the issue occurred
+- What you expected to happen vs what actually happened
+- Any error messages displayed in the app
+- Relevant entries from the server log if applicable
+
+**Key file locations on your server:**
+- Server logs: `\\Synology\printflow1\logs\combined.log`
+- Database: `\\Synology\printflow1\data\printflow.db`
+- Server source: `\\Synology\printflow1\server\src\``,
       },
     ],
   },
 ];
 
-// ── Component ────────────────────────────────────────────────────────────────
+// ── Component ─────────────────────────────────────────────────────────────────
 export default function HelpPage() {
   const [activeSection, setActiveSection] = useState('getting-started');
-  const [activeTopic, setActiveTopic]     = useState('overview');
-  const [search, setSearch]               = useState('');
+  const [activeTopic,   setActiveTopic]   = useState('overview');
+  const [search,        setSearch]        = useState('');
 
-  // Flatten all topics for search
   const allTopics = SECTIONS.flatMap(s =>
-    s.topics.map(t => ({ ...t, sectionId: s.id, sectionTitle: s.title, sectionIcon: s.icon }))
+    s.topics.map(t => ({ ...t, sectionId: s.id, sectionTitle: s.title }))
   );
 
   const searchResults = search.length > 1
@@ -657,7 +727,7 @@ export default function HelpPage() {
     setSearch('');
   }
 
-  // Simple markdown-like renderer
+  // Render content with markdown-like formatting
   function renderContent(text) {
     const lines = text.split('\n');
     const elements = [];
@@ -666,25 +736,31 @@ export default function HelpPage() {
     while (i < lines.length) {
       const line = lines[i];
 
-      // Table detection
-      if (line.startsWith('|') && i + 1 < lines.length && lines[i+1].startsWith('|---')) {
+      // Table
+      if (line.startsWith('|') && i + 1 < lines.length && lines[i + 1].startsWith('|---')) {
         const headers = line.split('|').filter(c => c.trim()).map(c => c.trim());
-        i += 2; // skip header and separator
+        i += 2;
         const rows = [];
         while (i < lines.length && lines[i].startsWith('|')) {
           rows.push(lines[i].split('|').filter(c => c.trim()).map(c => c.trim()));
           i++;
         }
         elements.push(
-          <div key={i} style={{ overflowX:'auto', marginBottom:16 }}>
-            <table style={{ width:'100%', borderCollapse:'collapse', fontSize:13 }}>
+          <div key={`table-${i}`} style={{ overflowX: 'auto', marginBottom: 20 }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
               <thead>
-                <tr>{headers.map((h,j) => <th key={j} style={{ textAlign:'left', padding:'8px 12px', borderBottom:'1.5px solid var(--border)', fontWeight:600, color:'var(--text-secondary)', fontSize:11, textTransform:'uppercase', letterSpacing:'0.04em' }}>{h}</th>)}</tr>
+                <tr>
+                  {headers.map((h, j) => (
+                    <th key={j} style={{ textAlign: 'left', padding: '8px 14px', borderBottom: '1.5px solid var(--border)', fontWeight: 600, color: 'var(--text-tertiary)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{h}</th>
+                  ))}
+                </tr>
               </thead>
               <tbody>
-                {rows.map((row,j) => (
-                  <tr key={j} style={{ borderBottom:'0.5px solid var(--border)' }}>
-                    {row.map((cell,k) => <td key={k} style={{ padding:'8px 12px', fontSize:13 }} dangerouslySetInnerHTML={{ __html: formatInline(cell) }}/>)}
+                {rows.map((row, j) => (
+                  <tr key={j} style={{ borderBottom: '0.5px solid var(--border)' }}>
+                    {row.map((cell, k) => (
+                      <td key={k} style={{ padding: '9px 14px', fontSize: 13 }} dangerouslySetInnerHTML={{ __html: formatInline(cell) }} />
+                    ))}
                   </tr>
                 ))}
               </tbody>
@@ -694,12 +770,9 @@ export default function HelpPage() {
         continue;
       }
 
-      if (line.trim() === '') {
-        i++;
-        continue;
-      }
+      if (line.trim() === '') { i++; continue; }
 
-      // Bullet points
+      // Bullet list
       if (line.startsWith('- ') || line.startsWith('• ')) {
         const bullets = [];
         while (i < lines.length && (lines[i].startsWith('- ') || lines[i].startsWith('• '))) {
@@ -707,11 +780,11 @@ export default function HelpPage() {
           i++;
         }
         elements.push(
-          <ul key={i} style={{ margin:'0 0 14px 0', paddingLeft:20, listStyle:'none' }}>
-            {bullets.map((b,j) => (
-              <li key={j} style={{ fontSize:14, lineHeight:1.7, color:'var(--text-secondary)', position:'relative', paddingLeft:4 }}>
-                <span style={{ position:'absolute', left:-16, color:'var(--accent)' }}>•</span>
-                <span dangerouslySetInnerHTML={{ __html: formatInline(b) }}/>
+          <ul key={`ul-${i}`} style={{ margin: '0 0 16px 0', paddingLeft: 0, listStyle: 'none' }}>
+            {bullets.map((b, j) => (
+              <li key={j} style={{ display: 'flex', gap: 10, fontSize: 14, lineHeight: 1.7, color: 'var(--text-secondary)', marginBottom: 4 }}>
+                <span style={{ color: 'var(--accent)', flexShrink: 0, marginTop: 2 }}>—</span>
+                <span dangerouslySetInnerHTML={{ __html: formatInline(b) }} />
               </li>
             ))}
           </ul>
@@ -719,10 +792,41 @@ export default function HelpPage() {
         continue;
       }
 
+      // Numbered list
+      if (/^\d+\. /.test(line)) {
+        const items = [];
+        while (i < lines.length && /^\d+\. /.test(lines[i])) {
+          items.push(lines[i].replace(/^\d+\. /, ''));
+          i++;
+        }
+        elements.push(
+          <ol key={`ol-${i}`} style={{ margin: '0 0 16px 0', paddingLeft: 0, listStyle: 'none' }}>
+            {items.map((item, j) => (
+              <li key={j} style={{ display: 'flex', gap: 12, fontSize: 14, lineHeight: 1.7, color: 'var(--text-secondary)', marginBottom: 6 }}>
+                <span style={{ color: 'var(--accent)', fontWeight: 600, flexShrink: 0, minWidth: 18, textAlign: 'right' }}>{j + 1}.</span>
+                <span dangerouslySetInnerHTML={{ __html: formatInline(item) }} />
+              </li>
+            ))}
+          </ol>
+        );
+        continue;
+      }
+
+      // Code block (backtick path)
+      if (line.startsWith('`') && line.endsWith('`')) {
+        elements.push(
+          <div key={`code-${i}`} style={{ fontFamily: 'monospace', fontSize: 12, background: 'var(--bg-hover)', border: '0.5px solid var(--border)', borderRadius: 6, padding: '8px 12px', marginBottom: 16, color: 'var(--accent)', wordBreak: 'break-all' }}>
+            {line.slice(1, -1)}
+          </div>
+        );
+        i++;
+        continue;
+      }
+
       // Regular paragraph
       elements.push(
-        <p key={i} style={{ fontSize:14, lineHeight:1.75, color:'var(--text-secondary)', marginBottom:14 }}
-          dangerouslySetInnerHTML={{ __html: formatInline(line) }}/>
+        <p key={`p-${i}`} style={{ fontSize: 14, lineHeight: 1.8, color: 'var(--text-secondary)', marginBottom: 14 }}
+          dangerouslySetInnerHTML={{ __html: formatInline(line) }} />
       );
       i++;
     }
@@ -733,59 +837,62 @@ export default function HelpPage() {
   function formatInline(text) {
     return text
       .replace(/\*\*(.+?)\*\*/g, '<strong style="color:var(--text-primary);font-weight:600">$1</strong>')
-      .replace(/`(.+?)`/g, '<code style="background:var(--bg-hover);padding:1px 6px;border-radius:4px;font-family:monospace;font-size:12px;color:var(--accent)">$1</code>')
-      .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" style="color:var(--accent);text-decoration:none">$1</a>');
+      .replace(/`(.+?)`/g, '<code style="background:var(--bg-hover);padding:1px 6px;border-radius:4px;font-family:monospace;font-size:12px;color:var(--accent)">$1</code>');
   }
 
   const appVersion = CHANGELOG[0]?.version || '—';
 
+  const allTopicsFlat = SECTIONS.flatMap(s => s.topics.map(t => ({ ...t, sectionId: s.id })));
+  const currentIdx    = allTopicsFlat.findIndex(t => t.id === activeTopic && t.sectionId === activeSection);
+  const prevTopic     = allTopicsFlat[currentIdx - 1];
+  const nextTopic     = allTopicsFlat[currentIdx + 1];
+
   return (
-    <div style={{ height:'100%', display:'flex', flexDirection:'column', overflow:'hidden' }}>
+    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+
       {/* Header */}
-      <div style={{ padding:'20px 24px 0', flexShrink:0 }}>
-        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:16 }}>
+      <div style={{ padding: '20px 24px 0', flexShrink: 0 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
           <div>
             <h1>Help & Support</h1>
-            <p style={{ color:'var(--text-secondary)', fontSize:13, marginTop:4 }}>
-              PrintFlow v{appVersion} — User guide and troubleshooting
+            <p style={{ color: 'var(--text-secondary)', fontSize: 13, marginTop: 4 }}>
+              PrintFlow v{appVersion} — User guide and reference documentation
             </p>
           </div>
         </div>
 
         {/* Search */}
-        <div style={{ position:'relative', marginBottom:16, maxWidth:420 }}>
-          <span style={{ position:'absolute', left:12, top:'50%', transform:'translateY(-50%)', color:'var(--text-tertiary)', fontSize:14, pointerEvents:'none' }}>🔍</span>
-          <input
-            className="input"
-            placeholder="Search help topics..."
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            style={{ paddingLeft:36, width:'100%' }}
-          />
+        <div style={{ position: 'relative', marginBottom: 16, maxWidth: 400 }}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+            style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-tertiary)', pointerEvents: 'none' }}>
+            <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+          </svg>
+          <input className="input" placeholder="Search all topics..." value={search}
+            onChange={e => setSearch(e.target.value)} style={{ paddingLeft: 36, width: '100%' }} />
           {search && (
             <button onClick={() => setSearch('')}
-              style={{ position:'absolute', right:10, top:'50%', transform:'translateY(-50%)', background:'none', border:'none', cursor:'pointer', color:'var(--text-tertiary)', fontSize:16 }}>✕</button>
+              style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-tertiary)', fontSize: 16, lineHeight: 1 }}>✕</button>
           )}
         </div>
       </div>
 
       {/* Search results */}
       {search.length > 1 && (
-        <div style={{ padding:'0 24px', flexShrink:0 }}>
+        <div style={{ padding: '0 24px 24px', overflowY: 'auto' }}>
           {searchResults.length === 0 ? (
-            <div style={{ padding:'16px 0', color:'var(--text-tertiary)', fontSize:13 }}>No results for "{search}"</div>
+            <div style={{ padding: '20px 0', color: 'var(--text-tertiary)', fontSize: 13 }}>No results found for "{search}"</div>
           ) : (
-            <div className="card" style={{ marginBottom:16 }}>
-              <div style={{ padding:'10px 16px', fontSize:11, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.06em', color:'var(--text-tertiary)', borderBottom:'0.5px solid var(--border)' }}>
+            <div className="card">
+              <div style={{ padding: '10px 18px', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-tertiary)', borderBottom: '0.5px solid var(--border)' }}>
                 {searchResults.length} result{searchResults.length !== 1 ? 's' : ''}
               </div>
               {searchResults.map(t => (
                 <div key={t.id} onClick={() => selectTopic(t.sectionId, t.id)}
-                  style={{ padding:'12px 16px', borderBottom:'0.5px solid var(--border)', cursor:'pointer' }}
-                  onMouseEnter={e => e.currentTarget.style.background='var(--bg-hover)'}
-                  onMouseLeave={e => e.currentTarget.style.background=''}>
-                  <div style={{ fontSize:13, fontWeight:600 }}>{t.sectionIcon} {t.title}</div>
-                  <div style={{ fontSize:11, color:'var(--text-tertiary)', marginTop:2 }}>{t.sectionTitle}</div>
+                  style={{ padding: '12px 18px', borderBottom: '0.5px solid var(--border)', cursor: 'pointer', transition: 'background 0.1s' }}
+                  onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-hover)'}
+                  onMouseLeave={e => e.currentTarget.style.background = ''}>
+                  <div style={{ fontSize: 13, fontWeight: 600 }}>{t.title}</div>
+                  <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 2 }}>{t.sectionTitle}</div>
                 </div>
               ))}
             </div>
@@ -795,81 +902,69 @@ export default function HelpPage() {
 
       {/* Main layout */}
       {!search && (
-        <div style={{ flex:1, display:'grid', gridTemplateColumns:'220px 1fr', overflow:'hidden', padding:'0 24px 24px', gap:16 }}>
+        <div style={{ flex: 1, display: 'grid', gridTemplateColumns: '210px 1fr', overflow: 'hidden', padding: '0 24px 24px', gap: 16 }}>
 
-          {/* Sidebar nav */}
-          <div style={{ overflowY:'auto' }}>
+          {/* Sidebar */}
+          <div style={{ overflowY: 'auto' }}>
             {SECTIONS.map(section => (
-              <div key={section.id} style={{ marginBottom:4 }}>
-                <div style={{ fontSize:11, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.06em', color:'var(--text-tertiary)', padding:'10px 8px 4px' }}>
-                  {section.icon} {section.title}
+              <div key={section.id} style={{ marginBottom: 2 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-tertiary)', padding: '10px 8px 4px' }}>
+                  <span style={{ opacity: 0.7 }}><SectionIcon id={section.id} /></span>
+                  {section.title}
                 </div>
-                {section.topics.map(topic => (
-                  <div key={topic.id}
-                    onClick={() => selectTopic(section.id, topic.id)}
-                    style={{
-                      padding:'7px 10px', borderRadius:7, cursor:'pointer', fontSize:13,
-                      fontWeight: activeTopic === topic.id && activeSection === section.id ? 600 : 400,
-                      background: activeTopic === topic.id && activeSection === section.id ? 'var(--accent-light)' : 'transparent',
-                      color: activeTopic === topic.id && activeSection === section.id ? 'var(--accent)' : 'var(--text-secondary)',
-                      marginBottom:1, transition:'all 0.1s',
-                    }}
-                    onMouseEnter={e => { if (!(activeTopic === topic.id && activeSection === section.id)) e.currentTarget.style.background='var(--bg-hover)'; }}
-                    onMouseLeave={e => { if (!(activeTopic === topic.id && activeSection === section.id)) e.currentTarget.style.background='transparent'; }}
-                  >
-                    {topic.title}
-                  </div>
-                ))}
+                {section.topics.map(topic => {
+                  const isActive = activeTopic === topic.id && activeSection === section.id;
+                  return (
+                    <div key={topic.id} onClick={() => selectTopic(section.id, topic.id)}
+                      style={{ padding: '7px 10px', borderRadius: 7, cursor: 'pointer', fontSize: 13, marginBottom: 1, transition: 'all 0.1s', fontWeight: isActive ? 500 : 400, background: isActive ? 'var(--accent-light)' : 'transparent', color: isActive ? 'var(--accent)' : 'var(--text-secondary)' }}
+                      onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = 'var(--bg-hover)'; }}
+                      onMouseLeave={e => { if (!isActive) e.currentTarget.style.background = 'transparent'; }}>
+                      {topic.title}
+                    </div>
+                  );
+                })}
               </div>
             ))}
 
-            {/* Version info at bottom */}
-            <div style={{ marginTop:24, padding:'12px 10px', background:'var(--bg-hover)', borderRadius:8, fontSize:11, color:'var(--text-tertiary)', lineHeight:1.7 }}>
-              <div style={{ fontWeight:600, color:'var(--text-secondary)', marginBottom:4 }}>PrintFlow v{appVersion}</div>
-              <div>Running on Synology NAS</div>
+            {/* Version badge */}
+            <div style={{ marginTop: 20, padding: '12px', background: 'var(--bg-hover)', borderRadius: 8, fontSize: 11, color: 'var(--text-tertiary)', lineHeight: 1.8, border: '0.5px solid var(--border)' }}>
+              <div style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>PrintFlow v{appVersion}</div>
               <div>Server: 10.0.0.219:3001</div>
             </div>
           </div>
 
-          {/* Content area */}
-          <div style={{ overflowY:'auto' }}>
+          {/* Content */}
+          <div style={{ overflowY: 'auto' }}>
             {currentTopic && (
-              <div className="card" style={{ padding:28 }}>
+              <div className="card" style={{ padding: 28 }}>
                 {/* Breadcrumb */}
-                <div style={{ fontSize:11, color:'var(--text-tertiary)', marginBottom:8 }}>
-                  {currentSection?.icon} {currentSection?.title} → {currentTopic.title}
+                <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <SectionIcon id={activeSection} />
+                  <span>{currentSection?.title}</span>
+                  <span style={{ opacity: 0.4 }}>›</span>
+                  <span>{currentTopic.title}</span>
                 </div>
-                <h2 style={{ fontSize:20, marginBottom:20, paddingBottom:16, borderBottom:'0.5px solid var(--border)' }}>
+
+                <h2 style={{ fontSize: 20, marginBottom: 20, paddingBottom: 16, borderBottom: '0.5px solid var(--border)' }}>
                   {currentTopic.title}
                 </h2>
+
                 <div>
                   {renderContent(currentTopic.content)}
                 </div>
 
-                {/* Next topic navigation */}
-                <div style={{ marginTop:32, paddingTop:16, borderTop:'0.5px solid var(--border)', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-                  {(() => {
-                    const allTopicsFlat = SECTIONS.flatMap(s => s.topics.map(t => ({ ...t, sectionId: s.id })));
-                    const currentIdx = allTopicsFlat.findIndex(t => t.id === activeTopic && t.sectionId === activeSection);
-                    const prev = allTopicsFlat[currentIdx - 1];
-                    const next = allTopicsFlat[currentIdx + 1];
-                    return (
-                      <>
-                        {prev ? (
-                          <button className="btn btn-ghost btn-sm" onClick={() => selectTopic(prev.sectionId, prev.id)}
-                            style={{ fontSize:12 }}>
-                            ← {prev.title}
-                          </button>
-                        ) : <div/>}
-                        {next ? (
-                          <button className="btn btn-secondary btn-sm" onClick={() => selectTopic(next.sectionId, next.id)}
-                            style={{ fontSize:12 }}>
-                            {next.title} →
-                          </button>
-                        ) : <div/>}
-                      </>
-                    );
-                  })()}
+                {/* Prev / Next */}
+                <div style={{ marginTop: 32, paddingTop: 16, borderTop: '0.5px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  {prevTopic ? (
+                    <button className="btn btn-ghost btn-sm" onClick={() => selectTopic(prevTopic.sectionId, prevTopic.id)} style={{ fontSize: 12 }}>
+                      ← {prevTopic.title}
+                    </button>
+                  ) : <div />}
+                  {nextTopic ? (
+                    <button className="btn btn-secondary btn-sm" onClick={() => selectTopic(nextTopic.sectionId, nextTopic.id)} style={{ fontSize: 12 }}>
+                      {nextTopic.title} →
+                    </button>
+                  ) : <div />}
                 </div>
               </div>
             )}
