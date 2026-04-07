@@ -214,6 +214,54 @@ const migrations = [
       CREATE INDEX IF NOT EXISTS idx_orders_historical  ON orders(is_historical);
     `,
   },
+  {
+    version: 5,
+    name: 'widen_platform_field',
+    sql: `
+      -- SQLite cannot ALTER a CHECK constraint, so we recreate the orders table
+      -- with an open-ended platform field to support any sales channel.
+      -- All existing data is preserved.
+      CREATE TABLE IF NOT EXISTS orders_new (
+        id               INTEGER PRIMARY KEY AUTOINCREMENT,
+        order_number     TEXT NOT NULL UNIQUE,
+        customer_name    TEXT NOT NULL,
+        customer_email   TEXT,
+        platform         TEXT NOT NULL DEFAULT 'direct',
+        description      TEXT NOT NULL,
+        filament_id      INTEGER REFERENCES filament_spools(id),
+        filament_used_g  REAL,
+        price_cad        REAL NOT NULL DEFAULT 0,
+        shipping_cad     REAL NOT NULL DEFAULT 0,
+        status           TEXT NOT NULL DEFAULT 'new'
+                         CHECK(status IN ('new','queued','printing','qc','packed','shipped','delivered','cancelled')),
+        due_date         DATE,
+        printer_serial   TEXT,
+        tracking_number  TEXT,
+        carrier          TEXT,
+        notes            TEXT,
+        paid_at          DATETIME,
+        payment_method   TEXT,
+        is_historical    INTEGER NOT NULL DEFAULT 0,
+        historical_date  DATE,
+        created_by       INTEGER REFERENCES users(id),
+        created_at       DATETIME NOT NULL DEFAULT (datetime('now')),
+        updated_at       DATETIME NOT NULL DEFAULT (datetime('now'))
+      );
+      INSERT INTO orders_new SELECT
+        id, order_number, customer_name, customer_email, platform, description,
+        filament_id, filament_used_g, price_cad, shipping_cad, status, due_date,
+        printer_serial, tracking_number, carrier, notes, paid_at, payment_method,
+        is_historical, historical_date, created_by, created_at, updated_at
+      FROM orders;
+      DROP TABLE orders;
+      ALTER TABLE orders_new RENAME TO orders;
+      CREATE INDEX IF NOT EXISTS idx_orders_status     ON orders(status);
+      CREATE INDEX IF NOT EXISTS idx_orders_due_date   ON orders(due_date);
+      CREATE INDEX IF NOT EXISTS idx_orders_created_at ON orders(created_at);
+      CREATE INDEX IF NOT EXISTS idx_orders_paid_at    ON orders(paid_at);
+      CREATE INDEX IF NOT EXISTS idx_orders_historical ON orders(is_historical);
+    `,
+  },
 ];
 
 function runMigrations() {
