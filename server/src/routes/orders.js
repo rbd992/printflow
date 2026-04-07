@@ -121,7 +121,7 @@ router.post('/', authenticate, authorize('owner', 'manager'),
 
 // PATCH /api/orders/:id  — status update available to all, full edit to owner/manager
 router.patch('/:id', authenticate,
-  body('status').optional().isIn(['new','queued','printing','qc','packed','shipped','delivered','cancelled']),
+  body('status').optional().isIn(['new','queued','quoted','confirmed','printing','printed','post-processing','qc','packed','shipped','delivered','paid','cancelled']),
   (req, res) => {
     const db = getDb();
     const existing = db.prepare('SELECT * FROM orders WHERE id = ?').get(req.params.id);
@@ -131,7 +131,7 @@ router.patch('/:id', authenticate,
     const allowed = isOperator
       ? ['status', 'notes']
       : ['customer_name','customer_email','platform','description','filament_id','price_cad','shipping_cad',
-         'due_date','status','tracking_number','carrier','printer_serial','notes','payment_method','paid_at'];
+         'due_date','status','tracking_number','carrier','printer_serial','notes','payment_method','paid_at','created_at'];
 
     const updates = {};
     for (const key of allowed) {
@@ -139,13 +139,13 @@ router.patch('/:id', authenticate,
     }
     if (Object.keys(updates).length === 0) return res.status(400).json({ error: 'No valid fields' });
 
-    const newStatus       = updates.status;
-    const wasDelivered    = existing.status === 'delivered';
-    const becomingDelivered = newStatus === 'delivered' && !wasDelivered;
-    const becomingCancelled = newStatus === 'cancelled'  && wasDelivered;
+    const newStatus         = updates.status;
+    const wasDelivered      = ['delivered','paid'].includes(existing.status);
+    const becomingPaid      = ['delivered','paid'].includes(newStatus) && !wasDelivered;
+    const becomingCancelled = newStatus === 'cancelled' && wasDelivered;
 
-    // Stamp paid_at on first delivery if not already set or explicitly provided
-    if (becomingDelivered && !existing.paid_at && !updates.paid_at) {
+    // Stamp paid_at on first payment if not already set or explicitly provided
+    if (becomingPaid && !existing.paid_at && !updates.paid_at) {
       updates.paid_at = new Date().toISOString();
     }
 
@@ -156,8 +156,8 @@ router.patch('/:id', authenticate,
 
     const updated = db.prepare('SELECT * FROM orders WHERE id = ?').get(existing.id);
 
-    // Create income transaction when a live order is first marked delivered
-    if (becomingDelivered && !existing.paid_at && !existing.is_historical) {
+    // Create income transaction when a live order is first marked paid/delivered
+    if (becomingPaid && !existing.paid_at && !existing.is_historical) {
       const existingTxn = db.prepare(
         'SELECT id FROM transactions WHERE order_id = ? AND type = ?'
       ).get(existing.id, 'income');
