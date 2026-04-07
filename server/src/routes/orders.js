@@ -48,24 +48,52 @@ router.post('/', authenticate, authorize('owner', 'manager'),
     if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
 
     const db = getDb();
-    const { customer_name, customer_email, platform, description, filament_id, price_cad, shipping_cad, due_date, notes } = req.body;
+    const {
+      customer_name, customer_email, platform, description,
+      filament_id, price_cad, shipping_cad, due_date, notes,
+      is_historical, historical_date, payment_method,
+    } = req.body;
 
     // Generate order number
     const count = db.prepare('SELECT COUNT(*) as n FROM orders').get().n;
     const order_number = `#${String(count + 1001).padStart(4, '0')}`;
 
+    // Historical orders are created as already paid/delivered
+    const isHist = !!is_historical;
+    const status = isHist ? 'delivered' : 'new';
+    const paid_at = isHist ? (historical_date || new Date().toISOString()) : null;
+    const hist_date = isHist ? (historical_date || null) : null;
+
     const result = db.prepare(`
-      INSERT INTO orders (order_number, customer_name, customer_email, platform, description, filament_id, price_cad, shipping_cad, due_date, notes, created_by)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(order_number, customer_name, customer_email ?? null, platform, description, filament_id ?? null, price_cad, shipping_cad ?? 0, due_date ?? null, notes ?? null, req.user.id);
+      INSERT INTO orders (
+        order_number, customer_name, customer_email, platform, description,
+        filament_id, price_cad, shipping_cad, due_date, notes, status,
+        paid_at, payment_method, is_historical, historical_date, created_by
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      order_number, customer_name, customer_email ?? null, platform, description,
+      filament_id ?? null, price_cad, shipping_cad ?? 0, due_date ?? null, notes ?? null, status,
+      paid_at, payment_method ?? null, isHist ? 1 : 0, hist_date, req.user.id
+    );
 
     const order = db.prepare('SELECT * FROM orders WHERE id = ?').get(result.lastInsertRowid);
 
-    // Auto-create income transaction
-    db.prepare(`
-      INSERT INTO transactions (date, description, category, type, amount_cad, hst_amount, order_id, created_by)
-      VALUES (date('now'), ?, 'sales', 'income', ?, ?, ?, ?)
-    `).run(`Order ${order_number} — ${customer_name}`, price_cad, parseFloat((price_cad * 0.13).toFixed(2)), order.id, req.user.id);
+    // Only create income transaction for historical orders (already paid)
+    // Live orders get a transaction when they are marked as paid/delivered
+    if (isHist) {
+      const txnDate = hist_date || new Date().toISOString().split('T')[0];
+      db.prepare(`
+        INSERT INTO transactions (date, description, category, type, amount_cad, hst_amount, order_id, created_by)
+        VALUES (?, ?, 'sales', 'income', ?, ?, ?, ?)
+      `).run(
+        txnDate,
+        `Order ${order_number} — ${customer_name} (historical)`,
+        price_cad,
+        parseFloat((price_cad * 0.13).toFixed(2)),
+        order.id,
+        req.user.id
+      );
+    }
 
     audit({ userId: req.user.id, userName: req.user.name, action: 'create', tableName: 'orders', recordId: order.id, newValue: order });
     broadcast('order:created', order);
@@ -85,19 +113,53 @@ router.patch('/:id', authenticate,
     const isOperator = req.user.role === 'operator';
     const allowed = isOperator
       ? ['status', 'notes']
-      : ['customer_name','customer_email','platform','description','filament_id','price_cad','shipping_cad','due_date','status','tracking_number','carrier','printer_serial','notes'];
+      : ['customer_name','customer_email','platform','description','filament_id','price_cad','shipping_cad','due_date','status','tracking_number','carrier','printer_serial','notes','payment_method'];
 
     const updates = {};
     for (const key of allowed) {
       if (req.body[key] !== undefined) updates[key] = req.body[key];
     }
     if (Object.keys(updates).length === 0) return res.status(400).json({ error: 'No valid fields' });
+
+    // Handle payment: mark paid_at when status moves to delivered
+    const newStatus = updates.status;
+    const wasDelivered = existing.status === 'delivered';
+    const becomingDelivered = newStatus === 'delivered' && !wasDelivered;
+    const becomingCancelled = newStatus === 'cancelled' && wasDelivered;
+
+    if (becomingDelivered && !existing.paid_at) {
+      updates.paid_at = new Date().toISOString();
+    }
+
     updates.updated_at = new Date().toISOString();
 
     const sets = Object.keys(updates).map(k => `${k} = ?`).join(', ');
     db.prepare(`UPDATE orders SET ${sets} WHERE id = ?`).run(...Object.values(updates), existing.id);
 
     const updated = db.prepare('SELECT * FROM orders WHERE id = ?').get(existing.id);
+
+    // Create income transaction when order is first marked delivered
+    if (becomingDelivered && !existing.paid_at && !existing.is_historical) {
+      const existingTxn = db.prepare('SELECT id FROM transactions WHERE order_id = ? AND type = ?').get(existing.id, 'income');
+      if (!existingTxn) {
+        db.prepare(`
+          INSERT INTO transactions (date, description, category, type, amount_cad, hst_amount, order_id, created_by)
+          VALUES (date('now'), ?, 'sales', 'income', ?, ?, ?, ?)
+        `).run(
+          `Order ${existing.order_number} \u2014 ${existing.customer_name}`,
+          existing.price_cad,
+          parseFloat((existing.price_cad * 0.13).toFixed(2)),
+          existing.id,
+          req.user.id
+        );
+      }
+    }
+
+    // Remove income transaction if order is cancelled after being delivered
+    if (becomingCancelled) {
+      db.prepare('DELETE FROM transactions WHERE order_id = ? AND type = ?').run(existing.id, 'income');
+    }
+
     audit({ userId: req.user.id, userName: req.user.name, action: 'update', tableName: 'orders', recordId: existing.id, oldValue: existing, newValue: updates });
     broadcast('order:updated', updated);
     res.json(updated);

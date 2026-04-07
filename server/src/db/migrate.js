@@ -196,6 +196,24 @@ const migrations = [
       ALTER TABLE printers ADD COLUMN bambu_uid TEXT;
     `,
   },
+  {
+    version: 4,
+    name: 'order_payment_and_historical_tracking',
+    sql: `
+      -- Add payment tracking to orders
+      ALTER TABLE orders ADD COLUMN paid_at DATETIME;
+      ALTER TABLE orders ADD COLUMN payment_method TEXT CHECK(payment_method IN ('cash','card','etransfer','paypal','other'));
+
+      -- Add historical import flag — orders from before PrintFlow was in use
+      -- Historical orders appear in history/records but are excluded from live reporting
+      ALTER TABLE orders ADD COLUMN is_historical INTEGER NOT NULL DEFAULT 0;
+      ALTER TABLE orders ADD COLUMN historical_date DATE;
+
+      -- Index for payment and historical queries
+      CREATE INDEX IF NOT EXISTS idx_orders_paid_at     ON orders(paid_at);
+      CREATE INDEX IF NOT EXISTS idx_orders_historical  ON orders(is_historical);
+    `,
+  },
 ];
 
 function runMigrations() {
