@@ -101,7 +101,7 @@ export default function JobQueuePage() {
     try {
       const [j, o, p] = await Promise.all([
         api.get('/api/jobs'),
-        ordersApi.list(),
+        ordersApi.list({ historical: 'all' }),
         api.get('/api/printers'),
       ]);
       setJobs(j.data || []);

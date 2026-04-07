@@ -3,6 +3,24 @@
 
 export const CHANGELOG = [
   {
+    version: '1.1.3',
+    date: '2026-04-07',
+    title: 'Backup & Restore UI + Full Audit',
+    highlights: [
+      'Backup & Restore section added to Settings — download DB, view stats, restore from file',
+      'Database stats shown: size, order count, transaction count',
+      'Restore automatically preserves the current database before replacing it',
+    ],
+    changes: [
+      { type: 'new',     text: 'Settings — Backup & Restore section (Owner only): shows DB size, order count, and transaction count' },
+      { type: 'new',     text: 'Settings — Download Backup button streams a safe online SQLite backup to the user\'s downloads' },
+      { type: 'new',     text: 'Settings — Restore from File button: upload a .db file to replace the live database (auto-preserves current before replacing)' },
+      { type: 'new',     text: 'Settings — Restore status feedback shown inline (success or error message)' },
+      { type: 'fix',     text: 'Dashboard — Upcoming Orders table now also excludes \'paid\' status (was only excluding delivered and cancelled)' },
+      { type: 'fix',     text: 'Job Queue — order list for linking now fetches with ?historical=all so all orders are available' },
+    ],
+  },
+  {
     version: '1.1.2',
     date: '2026-04-07',
     title: 'Quotes & Invoices — Company Info Auto-populated from Settings',

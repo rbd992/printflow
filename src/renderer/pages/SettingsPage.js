@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
 import { api, authApi, settingsApi } from '../api/client';
@@ -22,12 +22,19 @@ export default function SettingsPage({ onThemeChange }) {
   });
   const [companySaved, setCompanySaved]   = useState(false);
   const [companySaving, setCompanySaving] = useState(false);
+  const [backupInfo, setBackupInfo]       = useState(null);
+  const [backupLoading, setBackupLoading] = useState(false);
+  const [backupDownloading, setBackupDownloading] = useState(false);
+  const [restoreStatus, setRestoreStatus] = useState('');
+  const restoreFileRef = useRef(null);
 
   useEffect(() => {
     window.printflow.getTheme().then(t => setThemeLocal(t || 'dark'));
     setNewUrl(serverUrl);
     settingsApi.get('ntfy_config').then(r => { if (r.data?.value) setNtfy(r.data.value); }).catch(() => {});
     settingsApi.get('company_config').then(r => { if (r.data?.value) setCompany(c => ({ ...c, ...r.data.value })); }).catch(() => {});
+    // Load backup info (owner only)
+    api.get('/api/backup/info').then(r => setBackupInfo(r.data)).catch(() => {});
   }, [serverUrl]);
 
   async function changeTheme(t) { setThemeLocal(t); onThemeChange(t); await window.printflow.setTheme(t); }
@@ -61,6 +68,51 @@ export default function SettingsPage({ onThemeChange }) {
     try { await settingsApi.set('company_config', company); setCompanySaved(true); setTimeout(() => setCompanySaved(false), 2000); }
     catch { alert('Failed to save company settings'); }
     finally { setCompanySaving(false); }
+  }
+
+  async function downloadBackup() {
+    setBackupDownloading(true);
+    try {
+      const token = await window.printflow.getToken();
+      const { getServerUrl } = await import('../api/client');
+      const url = `${getServerUrl()}/api/backup/download`;
+      const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+      if (!res.ok) throw new Error(await res.text());
+      const blob = await res.blob();
+      const ts = new Date().toISOString().slice(0, 19).replace(/[T:]/g, '-');
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `printflow-backup-${ts}.db`;
+      a.click();
+      URL.revokeObjectURL(a.href);
+    } catch (e) {
+      alert('Backup failed: ' + e.message);
+    }
+    setBackupDownloading(false);
+  }
+
+  async function restoreBackup(file) {
+    if (!file) return;
+    if (!window.confirm(`Restore from "${file.name}"?\n\nThis will REPLACE all current data. The current database will be backed up first.\n\nAre you sure?`)) return;
+    setRestoreStatus('Uploading...');
+    try {
+      const token = await window.printflow.getToken();
+      const { getServerUrl } = await import('../api/client');
+      const formData = new FormData();
+      formData.append('database', file);
+      const res = await fetch(`${getServerUrl()}/api/backup/restore`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: formData,
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      setRestoreStatus('Restored. Please restart the server from DSM to apply changes.');
+      api.get('/api/backup/info').then(r => setBackupInfo(r.data)).catch(() => {});
+    } catch (e) {
+      setRestoreStatus('Restore failed: ' + e.message);
+    }
+    if (restoreFileRef.current) restoreFileRef.current.value = '';
   }
 
   const FC = k => ({ value: company[k]??'', onChange: e => setCompany(c => ({...c,[k]:e.target.value})) });
@@ -243,6 +295,64 @@ export default function SettingsPage({ onThemeChange }) {
             ))}
           </div>
         </div>
+
+        {/* ── Backup & Restore ─────────────────────────────────────────── */}
+        {user?.role === 'owner' && (
+          <div className="card" style={{ padding:20, marginBottom:14 }}>
+            <h3 style={{ marginBottom:6 }}>Backup & Restore</h3>
+            <p style={{ fontSize:12, color:'var(--text-secondary)', marginBottom:16, lineHeight:1.6 }}>
+              Download a complete backup of your PrintFlow database, or restore from a previous backup file.
+              The current database is automatically preserved before any restore.
+            </p>
+
+            {/* DB Info */}
+            {backupInfo?.exists && (
+              <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:10, marginBottom:16 }}>
+                {[
+                  ['Database Size', `${backupInfo.sizeMb} MB`],
+                  ['Total Orders', backupInfo.orders],
+                  ['Transactions', backupInfo.transactions],
+                ].map(([label, value]) => (
+                  <div key={label} style={{ padding:'10px 12px', background:'var(--bg-hover)', borderRadius:8, border:'0.5px solid var(--border)' }}>
+                    <div style={{ fontSize:10, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.05em', color:'var(--text-tertiary)', marginBottom:4 }}>{label}</div>
+                    <div style={{ fontSize:18, fontWeight:700 }}>{value}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div style={{ display:'flex', gap:10, flexWrap:'wrap', alignItems:'center' }}>
+              <button className="btn btn-primary" onClick={downloadBackup} disabled={backupDownloading}>
+                {backupDownloading ? 'Creating backup...' : '⬇ Download Backup'}
+              </button>
+
+              <div style={{ position:'relative' }}>
+                <input
+                  ref={restoreFileRef}
+                  type="file"
+                  accept=".db"
+                  style={{ position:'absolute', inset:0, opacity:0, cursor:'pointer', width:'100%' }}
+                  onChange={e => restoreBackup(e.target.files?.[0])}
+                />
+                <button className="btn btn-secondary" style={{ pointerEvents:'none' }}>↑ Restore from File</button>
+              </div>
+            </div>
+
+            {restoreStatus && (
+              <div style={{ marginTop:12, padding:'10px 14px', borderRadius:8, fontSize:13, lineHeight:1.5,
+                background: restoreStatus.includes('failed') ? 'var(--red-light)' : 'var(--green-light)',
+                color: restoreStatus.includes('failed') ? 'var(--red)' : 'var(--green)',
+                border: `0.5px solid ${restoreStatus.includes('failed') ? 'var(--red)' : 'var(--green)'}`,
+              }}>
+                {restoreStatus}
+              </div>
+            )}
+
+            <div style={{ marginTop:14, padding:'10px 14px', background:'var(--amber-light)', borderRadius:8, fontSize:12, color:'var(--amber)', border:'0.5px solid rgba(255,179,0,0.3)', lineHeight:1.5 }}>
+              ⚠ Restoring a backup replaces all data including orders, customers, transactions, and settings. This cannot be undone once the server is restarted.
+            </div>
+          </div>
+        )}
 
         {/* ── Sign Out ─────────────────────────────────────────────────── */}
         <div className="card" style={{ padding:20, border:'0.5px solid rgba(255,69,58,0.25)' }}>

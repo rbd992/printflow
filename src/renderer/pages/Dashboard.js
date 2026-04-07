@@ -200,7 +200,7 @@ export default function Dashboard() {
                   <td style={{ fontWeight: 600 }}>${o.price_cad.toFixed(2)}</td>
                 </tr>
               ))}
-              {recent_orders.filter(o => !['delivered','cancelled'].includes(o.status)).length === 0 && (
+              {recent_orders.filter(o => !['delivered','paid','cancelled'].includes(o.status)).length === 0 && (
                 <tr><td colSpan={7} style={{ textAlign: 'center', color: 'var(--text-tertiary)', padding: 24 }}>No active orders</td></tr>
               )}
             </tbody>
