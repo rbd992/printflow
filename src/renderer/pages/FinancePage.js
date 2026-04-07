@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { api } from '../api/client';
+import { api, settingsApi } from '../api/client';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, PieChart, Pie, Cell } from 'recharts';
 
 const CATEGORIES = ['sales','materials','shipping','fees','maintenance','other'];
@@ -19,6 +19,8 @@ export default function FinancePage() {
   const [form, setForm]         = useState({ date: new Date().toISOString().slice(0,10), description:'', category:'sales', type:'income', amount_cad:'' });
   const [adding, setAdding]     = useState(false);
   const [saving, setSaving]     = useState(false);
+  const [hstRate, setHstRate]   = useState(13);
+  const [hstEnabled, setHstEnabled] = useState(true);
 
   const load = useCallback(async () => {
     try {
@@ -28,7 +30,15 @@ export default function FinancePage() {
     finally { setLoading(false); }
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    load();
+    settingsApi.get('company_config').then(r => {
+      if (r.data?.value) {
+        setHstRate(parseFloat(r.data.value.hst_rate) || 13);
+        setHstEnabled(r.data.value.enable_hst !== false);
+      }
+    }).catch(() => {});
+  }, [load]);
 
   // ── Derived data ──────────────────────────────────────────────────────────
 
@@ -87,7 +97,9 @@ export default function FinancePage() {
       await api.post('/api/transactions', {
         ...form,
         amount_cad: parseFloat(form.amount_cad),
-        hst_amount: form.type==='income' ? parseFloat((form.amount_cad*0.13).toFixed(2)) : 0
+        hst_amount: (form.type === 'income' && hstEnabled)
+          ? parseFloat((form.amount_cad * hstRate / 100).toFixed(2))
+          : 0
       });
       setAdding(false);
       setForm({ date: new Date().toISOString().slice(0,10), description:'', category:'sales', type:'income', amount_cad:'' });

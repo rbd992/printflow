@@ -151,13 +151,17 @@ export default function Dashboard() {
                   <div style={{
                     width: 32, height: 32, borderRadius: 9, flexShrink: 0,
                     background: t.type === 'income' ? 'var(--green-light)' : 'var(--amber-light)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
                   }}>
-                    {t.type === 'income' ? '💳' : '📦'}
+                    {t.type === 'income' ? (
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--green)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+                    ) : (
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--amber)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10V8a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-2"/><path d="M12 12H3"/><path d="M16 6V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/><circle cx="18" cy="12" r="3"/></svg>
+                    )}
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.description}</div>
-                    <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 1 }}>{t.date}</div>
+                    <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 1 }}>{t.date ? new Date(t.date + 'T12:00:00').toLocaleDateString('en-CA', { month: 'short', day: 'numeric' }) : '—'}</div>
                   </div>
                   <div style={{
                     fontSize: 13, fontWeight: 700, flexShrink: 0,
