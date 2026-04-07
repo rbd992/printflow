@@ -41,6 +41,18 @@ async function start() {
       } catch (err) {
         logger.warn('BambuManager startup warning:', err.message);
       }
+      // Start OctoPrint pollers
+      try {
+        require('./routes/octoprint').startAllPollers();
+      } catch (err) {
+        logger.warn('OctoPrint startup warning:', err.message);
+      }
+      // Start Klipper pollers
+      try {
+        require('./routes/klipper').startAllPollers();
+      } catch (err) {
+        logger.warn('Klipper startup warning:', err.message);
+      }
     });
 
     // Graceful shutdown

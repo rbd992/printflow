@@ -288,6 +288,13 @@ const migrations = [
       PRAGMA foreign_keys = ON;
     `,
   },
+  {
+    version: 7,
+    name: 'add_connection_type_to_printers',
+    sql: `
+      ALTER TABLE printers ADD COLUMN connection_type TEXT NOT NULL DEFAULT 'bambu_lan';
+    `,
+  },
 ];
 
 function runMigrations() {

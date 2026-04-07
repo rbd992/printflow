@@ -24,36 +24,65 @@ function StatusDot({ status }) {
   return <div style={{ width:10,height:10,borderRadius:'50%',background:c,boxShadow:`0 0 6px ${c}`,flexShrink:0 }}/>;
 }
 
-// ── Printer form — defined OUTSIDE the page component to avoid remount bugs ──
+// ── Printer form — defined OUTSIDE the page component to avoid remount bugs ——
 function PrinterForm({ form, setForm, isEdit }) {
   const F = k => ({ value: form[k] ?? '', onChange: e => setForm(f => ({ ...f, [k]: e.target.value })) });
+  const connType = form.connection_type || 'bambu_lan';
+  const isBambu  = connType.startsWith('bambu');
+  const isOcto   = connType === 'octoprint';
+  const isKlipper = connType === 'klipper';
+  const isGeneric = connType === 'generic';
+
   return (
     <>
       <div className="form-row">
         <div className="form-group">
           <label className="label">Printer Name</label>
-          <input className="input" {...F('name')} placeholder="e.g. P1S Left" autoFocus />
+          <input className="input" {...F('name')} placeholder="e.g. Ender 3 Pro" autoFocus />
         </div>
         <div className="form-group">
-          <label className="label">Model</label>
-          <select className="select" {...F('model')}>
-            {['P1S','P1P','H2C','H2D','X1C','A1','A1 Mini'].map(m=><option key={m}>{m}</option>)}
+          <label className="label">Connection Type</label>
+          <select className="select" value={connType}
+            onChange={e => setForm(f => ({ ...f, connection_type: e.target.value }))}>
+            <option value="bambu_lan">Bambu Lab (LAN Mode)</option>
+            <option value="bambu_cloud">Bambu Lab (Cloud)</option>
+            <option value="octoprint">OctoPrint</option>
+            <option value="klipper">Klipper / Moonraker</option>
+            <option value="generic">Generic / Other</option>
           </select>
         </div>
       </div>
 
+      {isBambu && (
+        <div className="form-group">
+          <label className="label">Model</label>
+          <select className="select" {...F('model')}>
+            {['P1S','P1P','H2C','H2D','X1C','A1','A1 Mini'].map(m => <option key={m}>{m}</option>)}
+          </select>
+        </div>
+      )}
+      {!isBambu && (
+        <div className="form-group">
+          <label className="label">Model / Description</label>
+          <input className="input" {...F('model')} placeholder="e.g. Ender 3 Pro, Voron 2.4" />
+        </div>
+      )}
+
       {isEdit ? (
         <div className="form-group">
-          <label className="label">Serial Number</label>
+          <label className="label">Serial / ID</label>
           <div style={{ padding:'8px 12px',background:'var(--bg-hover)',borderRadius:'var(--r-sm)',fontFamily:'monospace',fontSize:13,color:'var(--text-tertiary)' }}>
             {form.serial}
           </div>
-          <div style={{ fontSize:11,color:'var(--text-tertiary)',marginTop:3 }}>Serial cannot be changed after registration</div>
+          <div style={{ fontSize:11,color:'var(--text-tertiary)',marginTop:3 }}>ID cannot be changed after registration</div>
         </div>
       ) : (
         <div className="form-group">
-          <label className="label">Serial Number</label>
-          <input className="input" {...F('serial')} placeholder="e.g. 01P00A123456789" style={{ fontFamily:'monospace' }} />
+          <label className="label">{isBambu ? 'Serial Number' : 'Unique ID'}</label>
+          <input className="input" {...F('serial')}
+            placeholder={isBambu ? 'e.g. 01P00A123456789' : 'e.g. ender3-workshop'}
+            style={{ fontFamily:'monospace' }} />
+          {!isBambu && <div style={{ fontSize:11,color:'var(--text-tertiary)',marginTop:3 }}>Any unique identifier for this printer</div>}
         </div>
       )}
 
@@ -63,51 +92,68 @@ function PrinterForm({ form, setForm, isEdit }) {
           <input className="input" {...F('ip_address')} placeholder="e.g. 10.0.0.150" style={{ fontFamily:'monospace' }} />
         </div>
         <div className="form-group">
-          <label className="label">LAN Access Code</label>
-          <input className="input" {...F('access_code')} placeholder="8-digit code" style={{ fontFamily:'monospace' }} />
+          <label className="label">
+            {isBambu ? 'LAN Access Code' : isOcto ? 'OctoPrint API Key' : isKlipper ? 'API Key (optional)' : 'Access Code / Key'}
+          </label>
+          <input className="input" {...F('access_code')}
+            placeholder={isBambu ? '8-digit code' : isOcto ? 'From OctoPrint Settings' : isKlipper ? 'Leave blank if none' : ''}
+            style={{ fontFamily:'monospace' }} />
         </div>
       </div>
 
-      <div className="form-row">
-        <div className="form-group" style={{ display:'flex',alignItems:'center',gap:8,paddingTop:20 }}>
-          <input type="checkbox" id="pf_has_ams" checked={!!form.has_ams}
-            onChange={e=>setForm(f=>({...f,has_ams:e.target.checked}))} style={{ width:16,height:16 }} />
-          <label htmlFor="pf_has_ams" style={{ fontSize:13,cursor:'pointer' }}>Has AMS unit</label>
+      {(isOcto || isKlipper) && (
+        <div style={{ padding:'10px 12px',background:'var(--accent-light)',borderRadius:'var(--r-sm)',fontSize:12,color:'var(--accent)',marginBottom:10,lineHeight:1.6 }}>
+          {isOcto && <><strong>OctoPrint:</strong> Find your API key in OctoPrint Settings → API. The IP address should be your OctoPrint host (no port needed — defaults to port 80).</>}
+          {isKlipper && <><strong>Klipper/Moonraker:</strong> Enter your Moonraker host IP. API key is optional unless you have auth enabled in Moonraker.</>}
         </div>
-        {form.has_ams && (
-          <div className="form-group">
-            <label className="label">AMS Tray Count</label>
-            <select className="select" {...F('ams_count')}>
-              <option value="4">4 trays</option>
-              <option value="8">8 trays (2× AMS)</option>
-              <option value="16">16 trays (4× AMS)</option>
-            </select>
+      )}
+
+      {isBambu && (
+        <div className="form-row">
+          <div className="form-group" style={{ display:'flex',alignItems:'center',gap:8,paddingTop:20 }}>
+            <input type="checkbox" id="pf_has_ams" checked={!!form.has_ams}
+              onChange={e => setForm(f => ({ ...f, has_ams: e.target.checked }))} style={{ width:16,height:16 }} />
+            <label htmlFor="pf_has_ams" style={{ fontSize:13,cursor:'pointer' }}>Has AMS unit</label>
           </div>
-        )}
-      </div>
+          {form.has_ams && (
+            <div className="form-group">
+              <label className="label">AMS Tray Count</label>
+              <select className="select" {...F('ams_count')}>
+                <option value="4">4 trays</option>
+                <option value="8">8 trays (2× AMS)</option>
+                <option value="16">16 trays (4× AMS)</option>
+              </select>
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="form-group">
         <label className="label">Notes (optional)</label>
         <input className="input" {...F('notes')} placeholder="e.g. Located in workshop" />
       </div>
 
-      <div style={{ fontSize:11,fontWeight:700,textTransform:'uppercase',letterSpacing:'0.06em',color:'var(--text-tertiary)',margin:'14px 0 6px',paddingTop:12,borderTop:'0.5px solid var(--border)' }}>
-        Camera Settings
-      </div>
-      <div style={{ padding:'8px 12px',background:'var(--bg-hover)',borderRadius:'var(--r-sm)',fontSize:12,color:'var(--text-secondary)',marginBottom:10,lineHeight:1.5 }}>
-        Leave blank to use the printer IP and access code above. Only needed if your camera uses different credentials.
-        <br/><strong>H2C/H2D:</strong> Enable "LAN Mode Liveview" in printer Settings → Network first.
-      </div>
-      <div className="form-row">
-        <div className="form-group">
-          <label className="label">Camera IP Address</label>
-          <input className="input" {...F('camera_ip')} placeholder="Same as printer IP" style={{ fontFamily:'monospace' }} />
-        </div>
-        <div className="form-group">
-          <label className="label">Camera Access Code</label>
-          <input className="input" {...F('camera_access_code')} placeholder="Same as LAN code" style={{ fontFamily:'monospace' }} />
-        </div>
-      </div>
+      {isBambu && (
+        <>
+          <div style={{ fontSize:11,fontWeight:700,textTransform:'uppercase',letterSpacing:'0.06em',color:'var(--text-tertiary)',margin:'14px 0 6px',paddingTop:12,borderTop:'0.5px solid var(--border)' }}>
+            Camera Settings
+          </div>
+          <div style={{ padding:'8px 12px',background:'var(--bg-hover)',borderRadius:'var(--r-sm)',fontSize:12,color:'var(--text-secondary)',marginBottom:10,lineHeight:1.5 }}>
+            Leave blank to use the printer IP and access code above.
+            <br/><strong>H2C/H2D:</strong> Enable “LAN Mode Liveview” in printer Settings → Network first.
+          </div>
+          <div className="form-row">
+            <div className="form-group">
+              <label className="label">Camera IP Address</label>
+              <input className="input" {...F('camera_ip')} placeholder="Same as printer IP" style={{ fontFamily:'monospace' }} />
+            </div>
+            <div className="form-group">
+              <label className="label">Camera Access Code</label>
+              <input className="input" {...F('camera_access_code')} placeholder="Same as LAN code" style={{ fontFamily:'monospace' }} />
+            </div>
+          </div>
+        </>
+      )}
     </>
   );
 }
@@ -382,7 +428,7 @@ function CloudLoginModal({ onClose, onSuccess }) {
 }
 
 // ── Blank form ────────────────────────────────────────────────────────────────
-const BLANK = { name:'',model:'P1S',serial:'',ip_address:'',access_code:'',has_ams:true,ams_count:4,notes:'',camera_ip:'',camera_access_code:'' };
+const BLANK = { name:'',model:'P1S',serial:'',ip_address:'',access_code:'',has_ams:true,ams_count:4,notes:'',camera_ip:'',camera_access_code:'',connection_type:'bambu_lan' };
 
 // ── Main page ─────────────────────────────────────────────────────────────────
 export default function PrintersPage() {
@@ -403,9 +449,18 @@ export default function PrintersPage() {
   const load = useCallback(async () => {
     try {
       const r  = await api.get('/api/printers');
-      const ls = await api.get('/api/bambu/status').catch(() => ({ data: {} }));
+      // Merge live states from all connection types
+      const [bambu, octo, klipper] = await Promise.all([
+        api.get('/api/bambu/status').catch(() => ({ data: {} })),
+        api.get('/api/octoprint/status').catch(() => ({ data: {} })),
+        api.get('/api/klipper/status').catch(() => ({ data: {} })),
+      ]);
       setPrinters(r.data);
-      setLiveStates(ls.data || {});
+      setLiveStates({
+        ...(bambu.data   || {}),
+        ...(octo.data    || {}),
+        ...(klipper.data || {}),
+      });
     } catch {}
     finally { setLoading(false); }
   }, []);
@@ -423,6 +478,7 @@ export default function PrintersPage() {
   async function addPrinter() {
     setSaving(true); setErr('');
     try {
+      const connType = form.connection_type || 'bambu_lan';
       await api.post('/api/printers', {
         name:                form.name,
         model:               form.model,
@@ -434,8 +490,12 @@ export default function PrintersPage() {
         notes:               form.notes,
         camera_ip:           form.camera_ip?.trim() || null,
         camera_access_code:  form.camera_access_code?.trim() || null,
+        connection_type:     connType,
       });
-      await api.post(`/api/bambu/connect/${form.serial.trim()}`).catch(() => {});
+      // Only auto-connect Bambu printers via MQTT here — others started server-side
+      if (connType === 'bambu_lan') {
+        await api.post(`/api/bambu/connect/${form.serial.trim()}`).catch(() => {});
+      }
       setShowAdd(false);
       setForm(BLANK);
       await load();
@@ -456,6 +516,7 @@ export default function PrintersPage() {
       notes:               printer.notes      || '',
       camera_ip:           printer.camera_ip  || '',
       camera_access_code:  printer.camera_access_code || '',
+      connection_type:     printer.connection_type || 'bambu_lan',
     });
     setEditingPrinter(printer);
     setErr('');
@@ -475,6 +536,7 @@ export default function PrintersPage() {
         notes:              form.notes,
         camera_ip:          form.camera_ip?.trim() || null,
         camera_access_code: form.camera_access_code?.trim() || null,
+        connection_type:    form.connection_type || 'bambu_lan',
       });
       setShowEdit(false);
       setEditingPrinter(null);
@@ -494,8 +556,14 @@ export default function PrintersPage() {
     } catch(e) { alert(e.response?.data?.error || 'Failed to remove printer'); }
   }
 
-  async function sendCommand(serial, cmd) {
-    try { await api.post(`/api/bambu/${serial}/${cmd}`); }
+  async function sendCommand(printer, cmd) {
+    const connType = printer.connection_type || 'bambu_lan';
+    const route = connType === 'octoprint' ? 'octoprint'
+                : connType === 'klipper'   ? 'klipper'
+                : 'bambu';
+    // Map stop → cancel for OctoPrint/Klipper
+    const apiCmd = (cmd === 'stop' && route !== 'bambu') ? 'cancel' : cmd;
+    try { await api.post(`/api/${route}/${printer.serial}/${apiCmd}`); }
     catch(e) { alert(`Command failed: ${e.response?.data?.error || e.message}`); }
   }
 
@@ -536,7 +604,14 @@ export default function PrintersPage() {
                     <StatusDot status={status} />
                     <div style={{ flex:1,minWidth:0 }}>
                       <div style={{ fontSize:15,fontWeight:700 }}>{p.name}</div>
-                      <div style={{ fontSize:12,color:'var(--text-secondary)' }}>{p.model} · {p.serial}</div>
+                      <div style={{ fontSize:12,color:'var(--text-secondary)' }}>
+                      {p.model} · {p.serial}
+                      {p.connection_type && p.connection_type !== 'bambu_lan' && (
+                        <span style={{ marginLeft:6,fontSize:10,padding:'1px 6px',background:'var(--accent-light)',color:'var(--accent)',borderRadius:4,fontWeight:600 }}>
+                          {p.connection_type === 'octoprint' ? 'OctoPrint' : p.connection_type === 'klipper' ? 'Klipper' : p.connection_type === 'bambu_cloud' ? 'Cloud' : p.connection_type}
+                        </span>
+                      )}
+                    </div>
                     </div>
                     <span className={`pill ${status==='printing'?'pill-green':status==='paused'?'pill-amber':status==='error'?'pill-red':status==='idle'?'pill-blue':'pill-grey'}`}>
                       {status}
@@ -584,9 +659,9 @@ export default function PrintersPage() {
                   {/* Print controls */}
                   {isOwner && isActive && (
                     <div style={{ display:'flex',gap:6,marginBottom:12 }}>
-                      {status==='printing' && <button className="btn btn-secondary btn-sm" onClick={()=>sendCommand(p.serial,'pause')}>Pause</button>}
-                      {status==='paused'   && <button className="btn btn-primary btn-sm"   onClick={()=>sendCommand(p.serial,'resume')}>Resume</button>}
-                      <button className="btn btn-danger btn-sm" onClick={()=>{ if(window.confirm('Stop print?')) sendCommand(p.serial,'stop'); }}>Stop</button>
+                      {status==='printing' && <button className="btn btn-secondary btn-sm" onClick={()=>sendCommand(p,'pause')}>Pause</button>}
+                      {status==='paused'   && <button className="btn btn-primary btn-sm"   onClick={()=>sendCommand(p,'resume')}>Resume</button>}
+                      <button className="btn btn-danger btn-sm" onClick={()=>{ if(window.confirm('Stop print?')) sendCommand(p,'stop'); }}>Stop</button>
                     </div>
                   )}
 
@@ -604,8 +679,10 @@ export default function PrintersPage() {
                     </div>
                   )}
 
-                  {/* Camera */}
-                  <CameraFeed printer={p} token={token} />
+                  {/* Camera — Bambu only */}
+                  {(!p.connection_type || p.connection_type.startsWith('bambu')) && (
+                    <CameraFeed printer={p} token={token} />
+                  )}
 
                   {/* Footer actions */}
                   {isOwner && (

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { CHANGELOG } from '../data/changelog';
+import { useAuthStore } from '../stores/authStore';
 
 // ── Section icons (SVG, no emojis) ──────────────────────────────────────────
 const SectionIcon = ({ id }) => {
@@ -706,6 +707,7 @@ export default function HelpPage() {
   const [activeSection, setActiveSection] = useState('getting-started');
   const [activeTopic,   setActiveTopic]   = useState('overview');
   const [search,        setSearch]        = useState('');
+  const { serverUrl } = useAuthStore();
 
   const allTopics = SECTIONS.flatMap(s =>
     s.topics.map(t => ({ ...t, sectionId: s.id, sectionTitle: s.title }))
@@ -929,7 +931,7 @@ export default function HelpPage() {
             {/* Version badge */}
             <div style={{ marginTop: 20, padding: '12px', background: 'var(--bg-hover)', borderRadius: 8, fontSize: 11, color: 'var(--text-tertiary)', lineHeight: 1.8, border: '0.5px solid var(--border)' }}>
               <div style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>PrintFlow v{appVersion}</div>
-              <div>Server: 10.0.0.219:3001</div>
+              <div>Server: {serverUrl || '10.0.0.219:3001'}</div>
             </div>
           </div>
 

@@ -31,31 +31,44 @@ router.get('/', authenticate, (req, res) => {
 // POST /api/printers  — owner only
 router.post('/', authenticate, authorize('owner'), (req, res) => {
   const db = getDb();
-  const { name, model, serial, ip_address, access_code, has_ams, ams_count, notes, camera_ip, camera_access_code } = req.body;
-  if (!name || !serial || !ip_address || !access_code) {
-    return res.status(400).json({ error: 'name, serial, ip_address, access_code required' });
+  const { name, model, serial, ip_address, access_code, has_ams, ams_count, notes, camera_ip, camera_access_code, connection_type } = req.body;
+  const connType = connection_type || 'bambu_lan';
+  // For non-Bambu types, serial and access_code may be optional
+  const isBambu = connType.startsWith('bambu');
+  if (!name || !serial || !ip_address || (isBambu && !access_code)) {
+    return res.status(400).json({ error: 'name, serial, ip_address required (access_code required for Bambu)' });
   }
   const result = db.prepare(`
-    INSERT INTO printers (name, model, serial, ip_address, access_code, has_ams, ams_count, notes, camera_ip, camera_access_code)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(name, model ?? 'Unknown', serial, ip_address, access_code, has_ams ? 1 : 0, ams_count ?? 0, notes ?? null, camera_ip ?? null, camera_access_code ?? null);
-  const printer = db.prepare('SELECT id, name, model, serial, ip_address, has_ams, ams_count, is_active, notes FROM printers WHERE id = ?').get(result.lastInsertRowid);
+    INSERT INTO printers (name, model, serial, ip_address, access_code, has_ams, ams_count, notes, camera_ip, camera_access_code, connection_type)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(name, model ?? 'Unknown', serial, ip_address, access_code ?? '', has_ams ? 1 : 0, ams_count ?? 0, notes ?? null, camera_ip ?? null, camera_access_code ?? null, connType);
+  const printer = db.prepare('SELECT * FROM printers WHERE id = ?').get(result.lastInsertRowid);
   audit({ userId: req.user.id, userName: req.user.name, action: 'create', tableName: 'printers', recordId: printer.id, newValue: printer });
   broadcast('printer:registered', printer);
+  // Auto-start the right poller
+  try {
+    if (connType === 'octoprint') {
+      require('./octoprint').startPoller(printer);
+    } else if (connType === 'klipper') {
+      require('./klipper').startPoller(printer);
+    } else if (connType === 'bambu_lan') {
+      require('../services/bambu/BambuManager').connect(printer);
+    }
+  } catch (e) { /* poller start failure is non-fatal */ }
   res.status(201).json(printer);
 });
 
 // PATCH /api/printers/:id  — edit printer settings (owner only)
 router.patch('/:id', authenticate, authorize('owner'), (req, res) => {
   const db = getDb();
-  const { name, model, ip_address, access_code, has_ams, ams_count, notes, camera_ip, camera_access_code } = req.body;
+  const { name, model, ip_address, access_code, has_ams, ams_count, notes, camera_ip, camera_access_code, connection_type } = req.body;
   const existing = db.prepare('SELECT * FROM printers WHERE id = ? AND is_active = 1').get(req.params.id);
   if (!existing) return res.status(404).json({ error: 'Printer not found' });
   db.prepare(`
     UPDATE printers SET
       name = ?, model = ?, ip_address = ?, access_code = ?,
       has_ams = ?, ams_count = ?, notes = ?,
-      camera_ip = ?, camera_access_code = ?
+      camera_ip = ?, camera_access_code = ?, connection_type = ?
     WHERE id = ?
   `).run(
     name ?? existing.name,
@@ -67,6 +80,7 @@ router.patch('/:id', authenticate, authorize('owner'), (req, res) => {
     notes ?? existing.notes,
     camera_ip !== undefined ? (camera_ip || null) : existing.camera_ip,
     camera_access_code !== undefined ? (camera_access_code || null) : existing.camera_access_code,
+    connection_type ?? existing.connection_type ?? 'bambu_lan',
     req.params.id
   );
   const updated = db.prepare('SELECT * FROM printers WHERE id = ?').get(req.params.id);

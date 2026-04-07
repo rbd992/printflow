@@ -25,6 +25,8 @@ const customersRoutes     = require('./routes/customers');
 const notificationsRoutes = require('./routes/notifications');
 const cameraRoutes        = require('./routes/camera');
 const backupRoutes         = require('./routes/backup');
+const octoprintRoutes      = require('./routes/octoprint');
+const klipperRoutes        = require('./routes/klipper');
 
 const app = express();
 
@@ -83,6 +85,8 @@ app.use('/api/customers',     customersRoutes);
 app.use('/api/notifications', notificationsRoutes);
 app.use('/api/camera',        cameraRoutes);
 app.use('/api/backup',        backupRoutes);
+app.use('/api/octoprint',     octoprintRoutes);
+app.use('/api/klipper',       klipperRoutes);
 
 // ── Camera popout viewer page ──────────────────────────────────
 app.get('/camera-popout', (req, res) => {
