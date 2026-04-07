@@ -327,11 +327,6 @@ export default function OnboardingPage({ onComplete }) {
                       </select>
                     </div>
                   )}
-
-                  <button className="btn btn-ghost btn-sm" style={{ marginTop: 16, color: 'var(--text-tertiary)', fontSize: 12 }}
-                    onClick={() => setSkipPrinter(true)}>
-                    Skip for now — I'll add printers later
-                  </button>
                 </>
               ) : (
                 <div style={{ padding: '20px', background: 'var(--bg-hover)', borderRadius: 8, border: '0.5px solid var(--border)', textAlign: 'center' }}>
@@ -381,6 +376,13 @@ export default function OnboardingPage({ onComplete }) {
           {step > 0 && !isLast && (
             <button className="btn btn-secondary" onClick={back} style={{ minWidth: 90, justifyContent: 'center' }}>
               Back
+            </button>
+          )}
+          {/* Skip button — only on printer step when form is visible */}
+          {current.id === 'printer' && !skipPrinter && (
+            <button className="btn btn-secondary" onClick={() => { setSkipPrinter(true); setErr(''); }}
+              style={{ minWidth: 90, justifyContent: 'center' }}>
+              Skip
             </button>
           )}
           <button

@@ -3,6 +3,44 @@
 
 export const CHANGELOG = [
   {
+    version: '1.1.1',
+    date: '2026-04-07',
+    title: 'EULA Polish, Onboarding Skip & Version Fix',
+    highlights: [
+      'EULA redesigned — readable prose with section headers, no more monospace text',
+      'Onboarding skip button is now a proper footer button on the printer step',
+      'Version numbers corrected across login screen, sidebar, release notes, and help page',
+    ],
+    changes: [
+      { type: 'fix',     text: 'EULA — replaced monospace/size-11 wall of text with readable prose, numbered sections, and highlighted acceptance notice' },
+      { type: 'fix',     text: 'Onboarding — Skip button moved from a buried ghost link to a proper footer button alongside Back and Continue' },
+      { type: 'fix',     text: 'Login screen version number corrected to v1.1.1 (was stuck at v1.0.35)' },
+      { type: 'fix',     text: 'Sidebar version number corrected to v1.1.1' },
+      { type: 'fix',     text: 'Changelog — v1.1.0 entry added (was missing, causing Help page and Release Notes to show v1.0.35 as latest)' },
+    ],
+  },
+  {
+    version: '1.1.0',
+    date: '2026-04-07',
+    title: 'EULA, Onboarding Wizard & Backup/Restore',
+    highlights: [
+      'First-run EULA screen — required acceptance before entering the app',
+      'Onboarding wizard — guided setup for new installs: business info, tax, first printer',
+      'Database backup and restore — download a copy of your data or restore from a backup',
+      'Multi-brand printer support in onboarding — Bambu, Prusa, Creality, Voron, and more',
+    ],
+    changes: [
+      { type: 'new', text: 'EULA — Software License Agreement shown on first launch; must scroll and accept before continuing' },
+      { type: 'new', text: 'Onboarding wizard — 5-step guided setup: welcome, business info, tax settings, first printer, done' },
+      { type: 'new', text: 'Onboarding — printer step supports Bambu LAN, Bambu Cloud, OctoPrint, Klipper/Moonraker, and Generic connection types' },
+      { type: 'new', text: 'Onboarding — skip printer option for users who are not ready to add a printer immediately' },
+      { type: 'new', text: 'Backup — GET /api/backup/download streams a safe online backup of the SQLite database' },
+      { type: 'new', text: 'Backup — GET /api/backup/info returns database stats: size, order count, transaction count, schema version' },
+      { type: 'new', text: 'Backup — POST /api/backup/restore accepts a .db file upload and replaces the live database' },
+      { type: 'improve', text: 'EULA — readable prose styling with section headers; accept button enabled only after scrolling to bottom' },
+    ],
+  },
+  {
     version: '1.0.35',
     date: '2026-04-07',
     title: 'Help Center Polish — Professional Design & Printer-Agnostic Copy',
