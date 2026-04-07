@@ -93,7 +93,22 @@ app.use('/api/backup',        backupRoutes);
 app.use('/api/octoprint',     octoprintRoutes);
 app.use('/api/klipper',       klipperRoutes);
 app.use('/api/email',         emailRoutes);
-app.use('/api/portal',        portalRoutes);
+
+// /api/portal — inlined with correct query (no is_historical filter, REPLACE strips #)
+app.get('/api/portal/order/:order_number', (req, res) => {
+  const db = getDb();
+  const raw = req.params.order_number.replace(/^#+/, '').trim();
+  const STATUS_LABELS = { new:'Received',queued:'Queued for printing',quoted:'Quote sent',confirmed:'Confirmed',printing:'Printing now',printed:'Print complete','post-processing':'Finishing',qc:'Quality check',packed:'Packed & ready',shipped:'Shipped',delivered:'Delivered',paid:'Complete',cancelled:'Cancelled' };
+  const order = db.prepare("SELECT order_number, description, status, due_date, tracking_number, carrier, notes, created_at, updated_at FROM orders WHERE UPPER(REPLACE(order_number,'#','')) = UPPER(?) ORDER BY id DESC LIMIT 1").get(raw);
+  if (!order) return res.status(404).json({ error: 'Order not found. Check your order number and try again.' });
+  res.json({ order_number: order.order_number, status: order.status, status_label: STATUS_LABELS[order.status]||order.status, description: order.description, due_date: order.due_date, tracking_number: order.tracking_number, carrier: order.carrier, created_at: order.created_at, updated_at: order.updated_at, notes: order.notes||null });
+});
+app.get('/api/portal/config', (req, res) => {
+  const db = getDb();
+  try { const row = db.prepare("SELECT value FROM app_settings WHERE key = 'company_config'").get(); if (row?.value) { const c=JSON.parse(row.value); return res.json({name:c.name||'PrintFlow',email:c.email||null}); } } catch {}
+  res.json({name:'PrintFlow',email:null});
+});
+
 app.use('/api/recurring',     recurringRoutes);
 app.use('/api/crash',         crashRoutes);
 
@@ -262,7 +277,7 @@ app.get('/track', (req, res) => {
   </div>
 </div>
 
-${biz.email||biz.phone ? `<p class="contact">Questions? ${biz.email?`<a href="mailto:${biz.email}">${biz.email}</a>`:''} ${biz.phone?`&middot; ${biz.phone}`:''}</p>` : ''}
+${biz.email||biz.phone ? `<p class="contact">Questions? ${biz.email?`<a href="mailto:${biz.email}">${biz.email}</a>`:''}</p>` : ''}
 
 <script>
 const STEPS = [
@@ -297,7 +312,7 @@ async function lookup(){
   const btn=document.getElementById('trackBtn');
   btn.disabled=true; btn.textContent='Tracking…';
   try{
-    const r=await fetch('/api/portal/order/%23'+encodeURIComponent(raw));
+    const r=await fetch('/api/portal/order/'+encodeURIComponent(raw));
     const d=await r.json();
     if(!r.ok){showErr(d.error||'Order not found.');return;}
     showResult(d);

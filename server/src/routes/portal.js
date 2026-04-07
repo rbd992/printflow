@@ -24,12 +24,15 @@ const STATUS_LABELS = {
 // GET /api/portal/order/:order_number — JSON lookup (used by the HTML page via fetch)
 router.get('/order/:order_number', (req, res) => {
   const db = getDb();
+  // Strip leading # and whitespace, try matching with and without #
+  const raw = req.params.order_number.replace(/^#+/, '').trim();
   const order = db.prepare(`
     SELECT order_number, customer_name, description, status,
            due_date, tracking_number, carrier, notes, created_at, updated_at
     FROM orders
-    WHERE UPPER(order_number) = UPPER(?) AND is_historical = 0
-  `).get(req.params.order_number.replace(/^#+/, '').trim());
+    WHERE UPPER(REPLACE(order_number, '#', '')) = UPPER(?)
+    ORDER BY id DESC LIMIT 1
+  `).get(raw);
 
   if (!order) return res.status(404).json({ error: 'Order not found. Check your order number and try again.' });
 
